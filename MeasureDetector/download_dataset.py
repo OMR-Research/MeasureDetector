@@ -37,16 +37,12 @@ def download_and_extract_dataset(dataset: str, base_url: str):
 
             bars = []
             for zone in surface.xpath('./*[local-name()="zone"][@type="measure"]'):
-                ulx = int(zone.get('ulx'))
-                uly = int(zone.get('uly'))
-                lrx = int(zone.get('lrx'))
-                lry = int(zone.get('lry'))
-                width = lrx - ulx
-                height = lry - uly
-                x = ulx
-                y = uly
+                left = int(zone.get('ulx'))
+                top = int(zone.get('uly'))
+                right = int(zone.get('lrx'))
+                bottom = int(zone.get('lry'))
 
-                data = {'x': x, 'y': y, 'width': width, 'height': height}
+                data = {'left': left, 'top': top, 'right': right, 'bottom': bottom}
                 bars.append(data)
 
             with open(json_path, 'w') as file:
@@ -54,5 +50,5 @@ def download_and_extract_dataset(dataset: str, base_url: str):
 
 
 if __name__ == "__main__":
-    download_and_extract_dataset("FreischuetzDigital", "https://digilib.freischuetz-digital.de/Scaler")
     download_and_extract_dataset("Bargheer", "https://bargheer.edirom.de/Scaler")
+    # download_and_extract_dataset("FreischuetzDigital", "https://digilib.freischuetz-digital.de/Scaler")
