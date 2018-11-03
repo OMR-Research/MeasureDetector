@@ -2,9 +2,11 @@ import hashlib
 import io
 import json
 import os
+import random
 from glob import glob
 
 import PIL.Image
+import contextlib2
 import tensorflow as tf
 from typing import List, Dict, Generator
 
@@ -12,12 +14,14 @@ from object_detection.dataset_tools import tf_record_creation_util
 from object_detection.utils import dataset_util
 from object_detection.utils import label_map_util
 from tqdm import tqdm
-import pandas as pd
 
 flags = tf.app.flags
 flags.DEFINE_string('data_dir', 'data', 'Root directory to raw dataset.')
-flags.DEFINE_string('output_path', './training.record', 'Path to output TFRecord')
+flags.DEFINE_string('output_path_training_split', './training.record', 'Path to output TFRecord')
+flags.DEFINE_string('output_path_validation_split', './validation.record', 'Path to output TFRecord')
+flags.DEFINE_string('output_path_test_split', './test.record', 'Path to output TFRecord')
 flags.DEFINE_string('label_map_path', 'mapping.txt', 'Path to label map proto')
+flags.DEFINE_integer('num_shards', 10, 'Number of TFRecord shards')
 FLAGS = flags.FLAGS
 
 
@@ -101,23 +105,53 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
             pass
 
 
+def get_training_validation_test_indices(all_image_paths):
+    seed = 0
+    validation_fraction = 0.1
+    test_fraction = 0.1
+    random.seed(seed)
+    dataset_size = len(all_image_paths)
+    all_indices = list(range(0, dataset_size))
+    validation_sample_size = int(dataset_size * validation_fraction)
+    test_sample_size = int(dataset_size * test_fraction)
+    validation_sample_indices = random.sample(all_indices, validation_sample_size)
+    test_sample_indices = random.sample((set(all_indices) - set(validation_sample_indices)), test_sample_size)
+    training_sample_indices = list(set(all_indices) - set(validation_sample_indices) - set(test_sample_indices))
+
+    return training_sample_indices, validation_sample_indices, test_sample_indices
+
+
 def main(_):
     dataset_directory = FLAGS.data_dir
-    os.makedirs(os.path.dirname(FLAGS.output_path), exist_ok=True)
-
-    writer = tf.python_io.TFRecordWriter(FLAGS.output_path)
-
+    number_of_shards = FLAGS.num_shards
+    os.makedirs(os.path.dirname(FLAGS.output_path_training_split), exist_ok=True)
     label_map_dict = label_map_util.get_label_map_dict(FLAGS.label_map_path)
-
     all_image_paths = glob(f"{dataset_directory}/**/*.jpg", recursive=True)
     all_annotation_paths = glob(f"{dataset_directory}/**/*.json", recursive=True)
 
+    training_sample_indices, validation_sample_indices, test_sample_indices = get_training_validation_test_indices(
+        all_image_paths)
+
     assert (len(all_image_paths) == len(all_annotation_paths))
 
-    for tf_example in annotations_to_tf_example_list(all_image_paths, all_annotation_paths, label_map_dict):
-        writer.write(tf_example.SerializeToString())
+    with contextlib2.ExitStack() as tf_record_close_stack:
+        training_tf_records = tf_record_creation_util.open_sharded_output_tfrecords(
+            tf_record_close_stack, FLAGS.output_path_training_split, number_of_shards)
+        validation_tf_records = tf_record_creation_util.open_sharded_output_tfrecords(
+            tf_record_close_stack, FLAGS.output_path_validation_split, number_of_shards)
+        test_tf_records = tf_record_creation_util.open_sharded_output_tfrecords(
+            tf_record_close_stack, FLAGS.output_path_test_split, number_of_shards)
+        index = 0
+        for tf_example in annotations_to_tf_example_list(all_image_paths, all_annotation_paths, label_map_dict):
+            shard_index = index % number_of_shards
+            index += 1
 
-    writer.close()
+            if index in training_sample_indices:
+                training_tf_records[shard_index].write(tf_example.SerializeToString())
+            elif index in validation_sample_indices:
+                validation_tf_records[shard_index].write(tf_example.SerializeToString())
+            elif index in test_sample_indices:
+                test_tf_records[shard_index].write(tf_example.SerializeToString())
 
 
 if __name__ == '__main__':
