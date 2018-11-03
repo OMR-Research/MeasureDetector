@@ -17,9 +17,9 @@ from tqdm import tqdm
 
 flags = tf.app.flags
 flags.DEFINE_string('data_dir', 'data', 'Root directory to raw dataset.')
-flags.DEFINE_string('output_path_training_split', './training.record', 'Path to output TFRecord')
-flags.DEFINE_string('output_path_validation_split', './validation.record', 'Path to output TFRecord')
-flags.DEFINE_string('output_path_test_split', './test.record', 'Path to output TFRecord')
+flags.DEFINE_string('output_path_training_split', 'data/training.record', 'Path to output TFRecord')
+flags.DEFINE_string('output_path_validation_split', 'data/validation.record', 'Path to output TFRecord')
+flags.DEFINE_string('output_path_test_split', 'data/test.record', 'Path to output TFRecord')
 flags.DEFINE_string('label_map_path', 'mapping.txt', 'Path to label map proto')
 flags.DEFINE_integer('num_shards', 10, 'Number of TFRecord shards')
 FLAGS = flags.FLAGS
@@ -48,6 +48,9 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
             image = PIL.Image.open(encoded_jpg_io)
             if image.format != 'JPEG':
                 print(f"Skipping image, that probably does not belong to the project {path_to_image}.")
+                continue
+            if image.width < 600 or image.height < 600:
+                print(f"Skipping image, that is smaller than 600x600 and might cause issues {path_to_image}.")
                 continue
             key = hashlib.sha256(encoded_jpg).hexdigest()
 
@@ -132,6 +135,7 @@ def main(_):
     training_sample_indices, validation_sample_indices, test_sample_indices = get_training_validation_test_indices(
         all_image_paths)
 
+    number_of_training_samples = number_of_validation_samples = number_of_test_samples = 0
     assert (len(all_image_paths) == len(all_annotation_paths))
 
     with contextlib2.ExitStack() as tf_record_close_stack:
@@ -148,10 +152,18 @@ def main(_):
 
             if index in training_sample_indices:
                 training_tf_records[shard_index].write(tf_example.SerializeToString())
+                number_of_training_samples += 1
             elif index in validation_sample_indices:
                 validation_tf_records[shard_index].write(tf_example.SerializeToString())
+                number_of_training_samples += 1
             elif index in test_sample_indices:
                 test_tf_records[shard_index].write(tf_example.SerializeToString())
+                number_of_training_samples += 1
+
+    print(f"Exported into\n"
+          f"- {len(training_sample_indices)} training samples\n"
+          f"- {len(validation_sample_indices)} validation samples\n"
+          f"- {len(test_sample_indices)} test samples")
 
 
 if __name__ == '__main__':
