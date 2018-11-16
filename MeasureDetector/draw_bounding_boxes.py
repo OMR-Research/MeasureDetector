@@ -9,8 +9,17 @@ def draw_bounding_boxes_into_image(image_path: str, ground_truth_annotations_pat
     with open(ground_truth_annotations_path, 'r') as gt_file:
         data = json.load(gt_file)
 
-    for bar in data["bars"]:
-        left, top, bottom, right = bar["left"], bar["top"], bar["bottom"], bar["right"]
+    draw_rectangles(data["system_measures"], img, (255, 0, 0), -1, 0.4)
+    draw_rectangles(data["stave_measures"], img, (255, 0, 255), -1, 0.4)
+    draw_rectangles(data["staves"], img, (0, 255, 255), -1, 0.4)
+
+    cv2.imwrite(destination_path, img)
+
+
+def draw_rectangles(rectangles, image, color, line_thickness, alpha):
+    for rectangle in rectangles:
+        left, top, bottom, right = rectangle["left"], rectangle["top"], rectangle["bottom"], \
+                                   rectangle["right"]
 
         # String to float, float to int
         left = int(float(left))
@@ -18,9 +27,9 @@ def draw_bounding_boxes_into_image(image_path: str, ground_truth_annotations_pat
         bottom = int(float(bottom))
         right = int(float(right))
 
-        cv2.rectangle(img, (left, top), (right, bottom), (0, 0, 255), 3)
-
-    cv2.imwrite(destination_path, img)
+        overlay = image.copy()
+        cv2.rectangle(overlay, (left, top), (right, bottom), color, line_thickness)
+        cv2.addWeighted(overlay, alpha, image, 1 - alpha, 0, image)
 
 
 if __name__ == "__main__":
