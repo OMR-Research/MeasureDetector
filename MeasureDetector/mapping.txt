@@ -6,4 +6,8 @@ item {
   id: 2
   name: 'stave_measure'
 }
+item {
+  id: 3
+  name: 'stave'
+}
 
