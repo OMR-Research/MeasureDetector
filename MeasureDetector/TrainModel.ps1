@@ -11,6 +11,7 @@ cd $pathToGitRoot
 # Available configurations - uncomment the one to actually run #
 ################################################################
 $configuration = "ssd_resnet50_v1_fpn_shared_box_predictor_640x640_edirom"
+$configuration = "ssd_retinanet_edirom_no_transfer_learning"
 #$configuration = "faster_rcnn_inception_v2_edirom"
 #$configuration = "faster_rcnn_inception_resnet_v2_atrous_edirom"
 
