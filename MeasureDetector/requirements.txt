@@ -17,3 +17,5 @@ lxml
 pydot
 tqdm
 opencv-python
+muscima
+omrdatasettools >= 0.13
