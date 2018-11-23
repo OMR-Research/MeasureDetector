@@ -1,3 +1,4 @@
+import argparse
 import json
 from glob import glob
 import os
@@ -45,10 +46,21 @@ def download_and_extract_dataset(dataset: str, base_url: str):
                 data = {'left': left, 'top': top, 'right': right, 'bottom': bottom}
                 system_measures.append(data)
 
+            stave_measures = []
+            staves = []
             with open(json_path, 'w') as file:
-                json.dump({'width': size[0], 'height': size[1], 'system_measures': system_measures}, file)
+                json.dump({'width': size[0], 'height': size[1], 'system_measures': system_measures,
+                           'stave_measures': stave_measures, 'staves': staves}, file)
 
 
 if __name__ == "__main__":
-    download_and_extract_dataset("Bargheer", "https://bargheer.edirom.de/Scaler")
-    download_and_extract_dataset("FreischuetzDigital", "https://digilib.freischuetz-digital.de/Scaler")
+    parser = argparse.ArgumentParser(description='Downloads a dataset from the Edirom system')
+    parser.add_argument('-dataset', dest='dataset', type=str, required=True,
+                        help='Must be either "Bargheer" or "FreischuetzDigital"')
+    parser.add_argument('-url', dest='url', type=str, required=True, help='URL where to download the dataset from')
+    args = parser.parse_args()
+
+    if args.dataset not in ["Bargheer", "FreischuetzDigital"]:
+        raise Exception("Invalid dataset specified. Must be either 'Bargheer' or 'FreischuetzDigital'")
+
+    download_and_extract_dataset(args.dataset, args.url)

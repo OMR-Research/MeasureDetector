@@ -66,7 +66,25 @@ Note, that you have to use [version 3.4.0](https://github.com/google/protobuf/re
 
 # Dataset
 
-TBD
+## MUSCIMA++
+The MUSCIMA++ dataset contains 140 images of handwritten music scores with manually annotated measure and staff line information. Therefore it includes three different types of information: 
+
+- Staff lines (yellow)
+- Staff measures (a measure on a single staff, red)
+- System measures (a measure that spans across the entire system, blue)
+
+![](MeasureDetector/samples/CVC-MUSCIMA_W-02_N-17_D-ideal_annotated.png)
+
+> Such images can be produced with the `draw_bounding_boxes.py` script that takes an image, a json with the annotations of those three categories and creates the annotated figure.
+
+To obtain the MUSCIMA++ dataset, simply run the `MeasureDetector/download_muscima-pp_dataset.py` script.
+
+Afterwards you have to convert the dataset to into the TF-Record format for Tensorflow to be able to read the data quickly. Run `create_tf_record.py -data_dir data/muscima_pp -num_shards 1` to do so.
+
+## Edirom
+For working with an Edirom dataset, you have to download that dataset first with the `download_edirom_dataset.py`. To avoid repeated crawling of that service, the URLs have to be provided manually. Please contact us if you are interested in this dataset.
+ 
+ ![](MeasureDetector/samples/A1-02_annotated.jpg)
  
 # Running the training
 

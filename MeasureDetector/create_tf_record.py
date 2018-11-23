@@ -41,18 +41,22 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
     for index in tqdm(range(total_number_of_images), desc="Serializing annotations", total=total_number_of_images):
         path_to_image, path_to_annotations = all_image_paths[index], all_annotation_paths[index]
 
+        assert (os.path.splitext(os.path.basename(path_to_image))[0] ==
+                os.path.splitext(os.path.basename(path_to_annotations))[0])
+
         try:
             with tf.gfile.GFile(path_to_image, 'rb') as fid:
-                encoded_jpg = fid.read()
-            encoded_jpg_io = io.BytesIO(encoded_jpg)
-            image = PIL.Image.open(encoded_jpg_io)
-            if image.format != 'JPEG':
-                print(f"Skipping image, that probably does not belong to the project {path_to_image}.")
+                encoded_image = fid.read()
+            encoded_image_io = io.BytesIO(encoded_image)
+            image = PIL.Image.open(encoded_image_io)
+            if image.format != 'JPEG' and image.format != 'PNG':
+                print(
+                    f"Skipping image, that is neither jpeg nor png and probably does not belong to the project {path_to_image}.")
                 continue
             if image.width < 600 or image.height < 600:
                 print(f"Skipping image, that is smaller than 600x600 and might cause issues {path_to_image}.")
                 continue
-            key = hashlib.sha256(encoded_jpg).hexdigest()
+            key = hashlib.sha256(encoded_image).hexdigest()
 
             width = image.width
             height = image.height
@@ -70,15 +74,19 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
             with open(path_to_annotations, 'r') as gt_file:
                 data = json.load(gt_file)
 
-            for bar in data["bars"]:
-                left, top, bottom, right = bar["left"], bar["top"], bar["bottom"], bar["right"]
+            object_classes = [("system_measures", "system_measure"), ("stave_measures", "stave_measure"),
+                              ("staves", "stave")]
+            for class_name, instance_name in object_classes:
+                for bounding_box in data[class_name]:
+                    left, top, bottom, right = bounding_box["left"], bounding_box["top"], bounding_box["bottom"], \
+                                               bounding_box["right"]
 
-                xmin.append(float(left) / width)
-                ymin.append(float(top) / height)
-                xmax.append(float(right) / width)
-                ymax.append(float(bottom) / height)
-                classes.append(label_map_dict["system_measure"])
-                classes_text.append("system_measure".encode('utf8'))
+                    xmin.append(float(left) / width)
+                    ymin.append(float(top) / height)
+                    xmax.append(float(right) / width)
+                    ymax.append(float(bottom) / height)
+                    classes.append(label_map_dict[instance_name])
+                    classes_text.append(instance_name.encode('utf8'))
 
             example = tf.train.Example(features=tf.train.Features(feature={
                 'image/height': dataset_util.int64_feature(height),
@@ -88,8 +96,8 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
                 'image/source_id': dataset_util.bytes_feature(
                     path_to_image.encode('utf8')),
                 'image/key/sha256': dataset_util.bytes_feature(key.encode('utf8')),
-                'image/encoded': dataset_util.bytes_feature(encoded_jpg),
-                'image/format': dataset_util.bytes_feature('jpeg'.encode('utf8')),
+                'image/encoded': dataset_util.bytes_feature(encoded_image),
+                'image/format': dataset_util.bytes_feature(image.format.lower().encode('utf8')),
                 'image/object/bbox/xmin': dataset_util.float_list_feature(xmin),
                 'image/object/bbox/xmax': dataset_util.float_list_feature(xmax),
                 'image/object/bbox/ymin': dataset_util.float_list_feature(ymin),
@@ -129,13 +137,14 @@ def main(_):
     number_of_shards = FLAGS.num_shards
     os.makedirs(os.path.dirname(FLAGS.output_path_training_split), exist_ok=True)
     label_map_dict = label_map_util.get_label_map_dict(FLAGS.label_map_path)
-    all_image_paths = glob(f"{dataset_directory}/**/*.jpg", recursive=True)
+    all_jpg_image_paths = glob(f"{dataset_directory}/**/*.jpg", recursive=True)
+    all_png_image_paths = glob(f"{dataset_directory}/**/*.png", recursive=True)
+    all_image_paths = all_jpg_image_paths + all_png_image_paths
     all_annotation_paths = glob(f"{dataset_directory}/**/*.json", recursive=True)
 
     training_sample_indices, validation_sample_indices, test_sample_indices = get_training_validation_test_indices(
         all_image_paths)
 
-    number_of_training_samples = number_of_validation_samples = number_of_test_samples = 0
     assert (len(all_image_paths) == len(all_annotation_paths))
 
     with contextlib2.ExitStack() as tf_record_close_stack:
@@ -152,13 +161,10 @@ def main(_):
 
             if index in training_sample_indices:
                 training_tf_records[shard_index].write(tf_example.SerializeToString())
-                number_of_training_samples += 1
             elif index in validation_sample_indices:
                 validation_tf_records[shard_index].write(tf_example.SerializeToString())
-                number_of_training_samples += 1
             elif index in test_sample_indices:
                 test_tf_records[shard_index].write(tf_example.SerializeToString())
-                number_of_training_samples += 1
 
     print(f"Exported into\n"
           f"- {len(training_sample_indices)} training samples\n"
