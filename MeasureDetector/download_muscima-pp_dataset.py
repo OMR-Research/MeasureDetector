@@ -23,7 +23,7 @@ def download_and_extract_muscima_measure_information(raw_data_directory: str):
     xml_files = glob(raw_data_directory + "/v1.0/data/cropobjects_withstaff/*.xml")
     image_files = glob(raw_data_directory + "/v1.0/data/images/*.png")
 
-    for xml_file in tqdm(xml_files, desc="Loading annotations"):
+    for xml_file in tqdm(xml_files, desc="Loading annotations and converting images from 8-bit to 24-bit"):
         image_file = [f for f in image_files if f.endswith(os.path.splitext(os.path.basename(xml_file))[0] + ".png")][0]
         json_file = os.path.join(json_directory, os.path.splitext(os.path.basename(xml_file))[0] + ".json")
         crop_objects = parse_cropobject_list(xml_file)
@@ -81,9 +81,12 @@ def download_and_extract_muscima_measure_information(raw_data_directory: str):
                 left = measure_separator.right
 
         with open(json_file, 'w') as file:
-            image = Image.open(image_file, "r")  # type: Image.Image
+            image = Image.open(image_file)  # type: Image.Image
             json.dump({'width': image.width, 'height': image.height, 'system_measures': system_measure_coordinates,
                        'stave_measures': staff_measures_coordinates, 'staves': staff_coordinates}, file)
+            # Blow up 8-bit image to 24-bit RGB, because the model expects RGB images
+            rgb_image = image.convert(mode="RGB")
+            rgb_image.save(image_file)
 
 
 if __name__ == "__main__":
