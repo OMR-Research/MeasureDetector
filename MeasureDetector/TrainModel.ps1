@@ -10,22 +10,23 @@ cd $pathToGitRoot
 ################################################################
 # Available configurations - uncomment the one to actually run #
 ################################################################
-$configuration = "ssd_resnet50_v1_fpn_shared_box_predictor_640x640_edirom"
-$configuration = "ssd_retinanet_edirom_no_transfer_learning"
+#$configuration = "ssd_resnet50_v1_fpn_shared_box_predictor_640x640_edirom"
+#$configuration = "ssd_retinanet_edirom_no_transfer_learning"
 #$configuration = "faster_rcnn_inception_v2_edirom"
 #$configuration = "faster_rcnn_inception_resnet_v2_atrous_edirom"
+$configuration = "faster_rcnn_inception_v2_muscima_pp"
 
 echo "Training with $($configuration) configuration"
 
-# # Legacy slim-based
-# Start-Transcript -path "$($pathToTranscript)/Train-$($configuration).txt" -append
-# python research/object_detection/legacy/train.py --pipeline_config_path="$($pathToSourceRoot)/configurations/$($configuration).config" --train_dir="$($pathToData)/checkpoints-$($configuration)-train"
-# Stop-Transcript
-
-# Estimator-based
-Start-Transcript -path "$($pathToTranscript)/TrainEval-$($configuration).txt" -append
-python research/object_detection/model_main.py --alsologtostderr --pipeline_config_path="$($pathToSourceRoot)/configurations/$($configuration).config" --model_dir="$($pathToData)/checkpoints-$($configuration)"
+# Legacy slim-based
+Start-Transcript -path "$($pathToTranscript)/Train-$($configuration).txt" -append
+python research/object_detection/legacy/train.py --pipeline_config_path="$($pathToSourceRoot)/configurations/$($configuration).config" --train_dir="$($pathToData)/checkpoints-$($configuration)-train"
 Stop-Transcript
+
+# # Estimator-based
+# Start-Transcript -path "$($pathToTranscript)/TrainEval-$($configuration).txt" -append
+# python research/object_detection/model_main.py --alsologtostderr --pipeline_config_path="$($pathToSourceRoot)/configurations/$($configuration).config" --model_dir="$($pathToData)/checkpoints-$($configuration)"
+# Stop-Transcript
 
 
 # C:\Users\Alex\Repositories\MusicObjectDetector-TF\MusicObjectDetector\training_scripts\ValidateModel.ps1
