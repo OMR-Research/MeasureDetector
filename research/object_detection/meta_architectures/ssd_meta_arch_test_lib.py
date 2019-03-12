@@ -16,7 +16,9 @@
 
 import functools
 import tensorflow as tf
+from google.protobuf import text_format
 
+from object_detection.builders import post_processing_builder
 from object_detection.core import anchor_generator
 from object_detection.core import balanced_positive_negative_sampler as sampler
 from object_detection.core import box_list
@@ -25,6 +27,8 @@ from object_detection.core import post_processing
 from object_detection.core import region_similarity_calculator as sim_calc
 from object_detection.core import target_assigner
 from object_detection.meta_architectures import ssd_meta_arch
+from object_detection.protos import calibration_pb2
+from object_detection.protos import model_pb2
 from object_detection.utils import ops
 from object_detection.utils import test_case
 from object_detection.utils import test_utils
@@ -111,29 +115,30 @@ class MockAnchorGenerator2x2(anchor_generator.AnchorGenerator):
 class SSDMetaArchTestBase(test_case.TestCase):
   """Base class to test SSD based meta architectures."""
 
-  def _create_model(self,
-                    model_fn=ssd_meta_arch.SSDMetaArch,
-                    apply_hard_mining=True,
-                    normalize_loc_loss_by_codesize=False,
-                    add_background_class=True,
-                    random_example_sampling=False,
-                    weight_regression_loss_by_score=False,
-                    use_expected_classification_loss_under_sampling=False,
-                    minimum_negative_sampling=1,
-                    desired_negative_sampling_ratio=3,
-                    use_keras=False,
-                    predict_mask=False,
-                    use_static_shapes=False,
-                    nms_max_size_per_class=5):
+  def _create_model(
+      self,
+      model_fn=ssd_meta_arch.SSDMetaArch,
+      apply_hard_mining=True,
+      normalize_loc_loss_by_codesize=False,
+      add_background_class=True,
+      random_example_sampling=False,
+      expected_loss_weights=model_pb2.DetectionModel().ssd.loss.NONE,
+      min_num_negative_samples=1,
+      desired_negative_sampling_ratio=3,
+      use_keras=False,
+      predict_mask=False,
+      use_static_shapes=False,
+      nms_max_size_per_class=5,
+      calibration_mapping_value=None):
     is_training = False
     num_classes = 1
     mock_anchor_generator = MockAnchorGenerator2x2()
     if use_keras:
       mock_box_predictor = test_utils.MockKerasBoxPredictor(
-          is_training, num_classes, predict_mask=predict_mask)
+          is_training, num_classes, add_background_class=add_background_class)
     else:
       mock_box_predictor = test_utils.MockBoxPredictor(
-          is_training, num_classes, predict_mask=predict_mask)
+          is_training, num_classes, add_background_class=add_background_class)
     mock_box_coder = test_utils.MockBoxCoder()
     if use_keras:
       fake_feature_extractor = FakeSSDKerasFeatureExtractor()
@@ -155,6 +160,24 @@ class SSDMetaArchTestBase(test_case.TestCase):
         max_size_per_class=nms_max_size_per_class,
         max_total_size=nms_max_size_per_class,
         use_static_shapes=use_static_shapes)
+    score_conversion_fn = tf.identity
+    calibration_config = calibration_pb2.CalibrationConfig()
+    if calibration_mapping_value:
+      calibration_text_proto = """
+      function_approximation {
+        x_y_pairs {
+            x_y_pair {
+              x: 0.0
+              y: %f
+            }
+            x_y_pair {
+              x: 1.0
+              y: %f
+            }}}""" % (calibration_mapping_value, calibration_mapping_value)
+      text_format.Merge(calibration_text_proto, calibration_config)
+      score_conversion_fn = (
+          post_processing_builder._build_calibrated_score_converter(  # pylint: disable=protected-access
+              tf.identity, calibration_config))
     classification_loss_weight = 1.0
     localization_loss_weight = 1.0
     negative_class_weight = 1.0
@@ -175,17 +198,22 @@ class SSDMetaArchTestBase(test_case.TestCase):
         region_similarity_calculator,
         mock_matcher,
         mock_box_coder,
-        negative_class_weight=negative_class_weight,
-        weight_regression_loss_by_score=weight_regression_loss_by_score)
+        negative_class_weight=negative_class_weight)
 
-    expected_classification_loss_under_sampling = None
-    if use_expected_classification_loss_under_sampling:
-      expected_classification_loss_under_sampling = functools.partial(
-          ops.expected_classification_loss_under_sampling,
-          minimum_negative_sampling=minimum_negative_sampling,
-          desired_negative_sampling_ratio=desired_negative_sampling_ratio)
+    model_config = model_pb2.DetectionModel()
+    if expected_loss_weights == model_config.ssd.loss.NONE:
+      expected_loss_weights_fn = None
+    else:
+      raise ValueError('Not a valid value for expected_loss_weights.')
 
     code_size = 4
+
+    kwargs = {}
+    if predict_mask:
+      kwargs.update({
+          'mask_prediction_fn': test_utils.MockMaskHead(num_classes=1).predict,
+      })
+
     model = model_fn(
         is_training=is_training,
         anchor_generator=mock_anchor_generator,
@@ -195,7 +223,7 @@ class SSDMetaArchTestBase(test_case.TestCase):
         encode_background_as_zeros=encode_background_as_zeros,
         image_resizer_fn=image_resizer_fn,
         non_max_suppression_fn=non_max_suppression_fn,
-        score_conversion_fn=tf.identity,
+        score_conversion_fn=score_conversion_fn,
         classification_loss=classification_loss,
         localization_loss=localization_loss,
         classification_loss_weight=classification_loss_weight,
@@ -209,8 +237,8 @@ class SSDMetaArchTestBase(test_case.TestCase):
         inplace_batchnorm_update=False,
         add_background_class=add_background_class,
         random_example_sampler=random_example_sampler,
-        expected_classification_loss_under_sampling=
-        expected_classification_loss_under_sampling)
+        expected_loss_weights_fn=expected_loss_weights_fn,
+        **kwargs)
     return model, num_classes, mock_anchor_generator.num_anchors(), code_size
 
   def _get_value_for_matching_key(self, dictionary, suffix):

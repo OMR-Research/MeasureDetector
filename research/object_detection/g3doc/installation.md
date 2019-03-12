@@ -11,7 +11,7 @@ Tensorflow Object Detection API depends on the following libraries:
 *   tf Slim (which is included in the "tensorflow/models/research/" checkout)
 *   Jupyter notebook
 *   Matplotlib
-*   Tensorflow (>=1.9.0)
+*   Tensorflow (>=1.12.0)
 *   Cython
 *   contextlib2
 *   cocoapi
@@ -108,7 +108,7 @@ Run the compilation process again, but use the downloaded version of protoc
 
 **If you are on MacOS:**
 
-If you have homebrew, download and install the protobuf with 
+If you have homebrew, download and install the protobuf with
 ```brew install protobuf```
 
 Alternately, run:
@@ -118,7 +118,7 @@ sudo unzip -o $PROTOC_ZIP -d /usr/local bin/protoc
 rm -f $PROTOC_ZIP
 ```
 
-Run the compilation process again: 
+Run the compilation process again:
 
 ``` bash
 # From tensorflow/models/research/

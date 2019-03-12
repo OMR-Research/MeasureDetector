@@ -19,7 +19,7 @@ import tensorflow as tf
 
 from object_detection.meta_architectures import ssd_meta_arch
 from object_detection.models import feature_map_generators
-from object_detection.models.keras_applications import mobilenet_v2
+from object_detection.models.keras_models import mobilenet_v2
 from object_detection.utils import ops
 from object_detection.utils import shape_utils
 
@@ -85,41 +85,44 @@ class SSDMobileNetV2KerasFeatureExtractor(
         override_base_feature_extractor_hyperparams=
         override_base_feature_extractor_hyperparams,
         name=name)
-    feature_map_layout = {
+    self._feature_map_layout = {
         'from_layer': ['layer_15/expansion_output', 'layer_19', '', '', '', ''],
         'layer_depth': [-1, -1, 512, 256, 256, 128],
         'use_depthwise': self._use_depthwise,
         'use_explicit_padding': self._use_explicit_padding,
     }
 
-    with tf.name_scope('MobilenetV2'):
-      full_mobilenet_v2 = mobilenet_v2.mobilenet_v2(
-          batchnorm_training=(is_training and not freeze_batchnorm),
-          conv_hyperparams=(conv_hyperparams
-                            if self._override_base_feature_extractor_hyperparams
-                            else None),
-          weights=None,
-          use_explicit_padding=use_explicit_padding,
-          alpha=self._depth_multiplier,
-          min_depth=self._min_depth,
-          include_top=False)
-      conv2d_11_pointwise = full_mobilenet_v2.get_layer(
-          name='block_13_expand_relu').output
-      conv2d_13_pointwise = full_mobilenet_v2.get_layer(name='out_relu').output
-      self.mobilenet_v2 = tf.keras.Model(
-          inputs=full_mobilenet_v2.inputs,
-          outputs=[conv2d_11_pointwise, conv2d_13_pointwise])
+    self.mobilenet_v2 = None
+    self.feature_map_generator = None
 
-      self.feature_map_generator = (
-          feature_map_generators.KerasMultiResolutionFeatureMaps(
-              feature_map_layout=feature_map_layout,
-              depth_multiplier=self._depth_multiplier,
-              min_depth=self._min_depth,
-              insert_1x1_conv=True,
-              is_training=is_training,
-              conv_hyperparams=conv_hyperparams,
-              freeze_batchnorm=freeze_batchnorm,
-              name='FeatureMaps'))
+  def build(self, input_shape):
+    full_mobilenet_v2 = mobilenet_v2.mobilenet_v2(
+        batchnorm_training=(self._is_training and not self._freeze_batchnorm),
+        conv_hyperparams=(self._conv_hyperparams
+                          if self._override_base_feature_extractor_hyperparams
+                          else None),
+        weights=None,
+        use_explicit_padding=self._use_explicit_padding,
+        alpha=self._depth_multiplier,
+        min_depth=self._min_depth,
+        include_top=False)
+    conv2d_11_pointwise = full_mobilenet_v2.get_layer(
+        name='block_13_expand_relu').output
+    conv2d_13_pointwise = full_mobilenet_v2.get_layer(name='out_relu').output
+    self.mobilenet_v2 = tf.keras.Model(
+        inputs=full_mobilenet_v2.inputs,
+        outputs=[conv2d_11_pointwise, conv2d_13_pointwise])
+    self.feature_map_generator = (
+        feature_map_generators.KerasMultiResolutionFeatureMaps(
+            feature_map_layout=self._feature_map_layout,
+            depth_multiplier=self._depth_multiplier,
+            min_depth=self._min_depth,
+            insert_1x1_conv=True,
+            is_training=self._is_training,
+            conv_hyperparams=self._conv_hyperparams,
+            freeze_batchnorm=self._freeze_batchnorm,
+            name='FeatureMaps'))
+    self.built = True
 
   def preprocess(self, resized_inputs):
     """SSD preprocessing.

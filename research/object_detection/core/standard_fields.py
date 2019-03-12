@@ -44,7 +44,8 @@ class InputDataFields(object):
     groundtruth_image_confidences: image-level class confidences.
     groundtruth_boxes: coordinates of the ground truth boxes in the image.
     groundtruth_classes: box-level class labels.
-    groundtruth_confidences: box-level class confidences.
+    groundtruth_confidences: box-level class confidences. The shape should be
+      the same as the shape of groundtruth_classes.
     groundtruth_label_types: box-level label types (e.g. explicit negative).
     groundtruth_is_crowd: [DEPRECATED, use groundtruth_group_of instead]
       is the groundtruth a single object or a crowd.
@@ -60,7 +61,7 @@ class InputDataFields(object):
     groundtruth_instance_classes: instance mask-level class labels.
     groundtruth_keypoints: ground truth keypoints.
     groundtruth_keypoint_visibilities: ground truth keypoint visibilities.
-    groundtruth_label_scores: groundtruth label scores.
+    groundtruth_label_weights: groundtruth label weights.
     groundtruth_weights: groundtruth weight factor for bounding boxes.
     num_groundtruth_boxes: number of groundtruth boxes.
     is_annotated: whether an image has been labeled or not.
@@ -92,7 +93,7 @@ class InputDataFields(object):
   groundtruth_instance_classes = 'groundtruth_instance_classes'
   groundtruth_keypoints = 'groundtruth_keypoints'
   groundtruth_keypoint_visibilities = 'groundtruth_keypoint_visibilities'
-  groundtruth_label_scores = 'groundtruth_label_scores'
+  groundtruth_label_weights = 'groundtruth_label_weights'
   groundtruth_weights = 'groundtruth_weights'
   num_groundtruth_boxes = 'num_groundtruth_boxes'
   is_annotated = 'is_annotated'
@@ -113,6 +114,9 @@ class DetectionResultFields(object):
     detection_boundaries: contains an object boundary for each detection box.
     detection_keypoints: contains detection keypoints for each detection box.
     num_detections: number of detections in the batch.
+    raw_detection_boxes: contains decoded detection boxes without Non-Max
+      suppression.
+    raw_detection_scores: contains class score logits for raw detection boxes.
   """
 
   source_id = 'source_id'
@@ -124,6 +128,8 @@ class DetectionResultFields(object):
   detection_boundaries = 'detection_boundaries'
   detection_keypoints = 'detection_keypoints'
   num_detections = 'num_detections'
+  raw_detection_boxes = 'raw_detection_boxes'
+  raw_detection_scores = 'raw_detection_scores'
 
 
 class BoxListFields(object):
@@ -145,6 +151,7 @@ class BoxListFields(object):
   classes = 'classes'
   scores = 'scores'
   weights = 'weights'
+  confidences = 'confidences'
   objectness = 'objectness'
   masks = 'masks'
   boundaries = 'boundaries'
