@@ -51,7 +51,7 @@ message EvalConfig {
   optional float min_score_threshold = 13 [default=0.5];
 
   // Maximum number of detections to visualize
-  optional int32 max_num_boxes_to_visualize = 14 [default=20];
+  optional int32 max_num_boxes_to_visualize = 14 [default=1000];
 
   // When drawing a single detection, each label is by default visualized as
   // <label name> : <label score>. One can skip the name or/and score using the
