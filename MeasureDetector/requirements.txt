@@ -3,19 +3,20 @@ matplotlib
 Pillow >= 4.2.1
 graphviz # for graphviz, installation via the system might be required, e.g. sudo apt-get install graphviz
 pytest
-protobuf == 3.4.0
+#protobuf == 3.4.0
 
 # Use pip install ... to install these
-tensorflow == 1.9.0
-# tensorflow-gpu == 1.9.0 # Alternatively if available to run vastly faster trainings. See https://github.com/philferriere/dlwin
+#tensorflow == 1.13.1
+# tensorflow-gpu == 1.13.1 # Alternatively if available to run vastly faster trainings. See https://github.com/philferriere/dlwin
 h5py
 scikit-learn
-scipy
+scikit-image >= 0.14.2
+scipy >= 1.2.1
 sympy
-numpy
+muscima >= 0.10.0
+numpy >= 1.16.2
 lxml
 pydot
 tqdm
 opencv-python
-muscima
-omrdatasettools >= 0.13
+omrdatasettools >= 0.15
