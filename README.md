@@ -79,7 +79,16 @@ The MUSCIMA++ dataset contains 140 images of handwritten music scores with manua
 
 To obtain the MUSCIMA++ dataset, simply run the `MeasureDetector/prepare_muscima-pp_dataset.py` script.
 
-Afterwards you have to convert the dataset to into the TF-Record format for Tensorflow to be able to read the data quickly. Run `create_tf_record.py -data_dir data/muscima_pp -num_shards 1` to do so.
+Afterwards you have to convert the dataset to into the TF-Record format for Tensorflow to be able to read the data quickly. Run 
+    
+    create_tf_record.py -image_directory data/muscima_pp/v1.0/data/images 
+                        -annotation_directory data/muscima_pp/v1.0/data/json
+                        -output_path_training_split=data/muscima_pp/training.record
+                        -output_path_validation_split=data/muscima_pp/validation.record
+                        -output_path_test_split=data/muscima_pp/test.record 
+                        -num_shards 1 
+    
+ to do so.
 
 ## Edirom
 For working with an Edirom dataset, you have to download that dataset first with the `prepare_edirom_dataset.py`. To avoid repeated crawling of that service, the URLs have to be provided manually. Please contact us if you are interested in this dataset.

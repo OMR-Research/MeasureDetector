@@ -1,3 +1,4 @@
+import argparse
 import hashlib
 import io
 import json
@@ -14,15 +15,6 @@ from object_detection.dataset_tools import tf_record_creation_util
 from object_detection.utils import dataset_util
 from object_detection.utils import label_map_util
 from tqdm import tqdm
-
-flags = tf.app.flags
-flags.DEFINE_string('data_dir', 'data', 'Root directory to raw dataset.')
-flags.DEFINE_string('output_path_training_split', 'data/training.record', 'Path to output TFRecord')
-flags.DEFINE_string('output_path_validation_split', 'data/validation.record', 'Path to output TFRecord')
-flags.DEFINE_string('output_path_test_split', 'data/test.record', 'Path to output TFRecord')
-flags.DEFINE_string('label_map_path', 'mapping.txt', 'Path to label map proto')
-flags.DEFINE_integer('num_shards', 10, 'Number of TFRecord shards')
-FLAGS = flags.FLAGS
 
 
 def annotations_to_tf_example_list(all_image_paths: List[str],
@@ -132,15 +124,14 @@ def get_training_validation_test_indices(all_image_paths):
     return training_sample_indices, validation_sample_indices, test_sample_indices
 
 
-def main(_):
-    dataset_directory = FLAGS.data_dir
-    number_of_shards = FLAGS.num_shards
-    os.makedirs(os.path.dirname(FLAGS.output_path_training_split), exist_ok=True)
-    label_map_dict = label_map_util.get_label_map_dict(FLAGS.label_map_path)
-    all_jpg_image_paths = glob(f"{dataset_directory}/**/*.jpg", recursive=True)
-    all_png_image_paths = glob(f"{dataset_directory}/**/*.png", recursive=True)
+def main(image_directory: str, annotation_directory: str, output_path_training_split: str,
+         output_path_validation_split: str, output_path_test_split: str, label_map_path: str, number_of_shards: int):
+    os.makedirs(os.path.dirname(output_path_training_split), exist_ok=True)
+    label_map_dict = label_map_util.get_label_map_dict(label_map_path)
+    all_jpg_image_paths = glob(f"{image_directory}/**/*.jpg", recursive=True)
+    all_png_image_paths = glob(f"{image_directory}/**/*.png", recursive=True)
     all_image_paths = all_jpg_image_paths + all_png_image_paths
-    all_annotation_paths = glob(f"{dataset_directory}/**/*.json", recursive=True)
+    all_annotation_paths = glob(f"{annotation_directory}/**/*.json", recursive=True)
 
     training_sample_indices, validation_sample_indices, test_sample_indices = get_training_validation_test_indices(
         all_image_paths)
@@ -149,11 +140,11 @@ def main(_):
 
     with contextlib2.ExitStack() as tf_record_close_stack:
         training_tf_records = tf_record_creation_util.open_sharded_output_tfrecords(
-            tf_record_close_stack, FLAGS.output_path_training_split, number_of_shards)
+            tf_record_close_stack, output_path_training_split, number_of_shards)
         validation_tf_records = tf_record_creation_util.open_sharded_output_tfrecords(
-            tf_record_close_stack, FLAGS.output_path_validation_split, number_of_shards)
+            tf_record_close_stack, output_path_validation_split, number_of_shards)
         test_tf_records = tf_record_creation_util.open_sharded_output_tfrecords(
-            tf_record_close_stack, FLAGS.output_path_test_split, number_of_shards)
+            tf_record_close_stack, output_path_test_split, number_of_shards)
         index = 0
         for tf_example in annotations_to_tf_example_list(all_image_paths, all_annotation_paths, label_map_dict):
             shard_index = index % number_of_shards
@@ -173,4 +164,30 @@ def main(_):
 
 
 if __name__ == '__main__':
-    tf.app.run()
+    parser = argparse.ArgumentParser(description='Creates a tensorflow record from an existing dataset')
+    parser.add_argument('-image_directory', type=str, default="data/muscima_pp/v1.0/data/images",
+                        help='Directory, where the images are stored')
+    parser.add_argument('-annotation_directory', type=str, default="data/muscima_pp/v1.0/data/json",
+                        help='Directory, where the annotations are stored')
+    parser.add_argument('-output_path_training_split', type=str, default="data/muscima_pp/training.record",
+                        help='Path to output TFRecord')
+    parser.add_argument('-output_path_validation_split', type=str, default="data/muscima_pp/validation.record",
+                        help='Path to output TFRecord')
+    parser.add_argument('-output_path_test_split', type=str, default="data/muscima_pp/test.record",
+                        help='Path to output TFRecord')
+    parser.add_argument('-label_map_path', type=str, default='mapping.txt',
+                        help='Path to label map proto.txt')
+    parser.add_argument('-num_shards', type=int, default=1, help='Number of TFRecord shards')
+
+    flags = parser.parse_args()
+    image_directory = flags.image_directory
+    annotations_directory = flags.annotation_directory
+    output_path_training_split = flags.output_path_training_split
+    output_path_validation_split = flags.output_path_validation_split
+    output_path_test_split = flags.output_path_test_split
+    label_map_path = flags.label_map_path
+    number_of_shards = flags.num_shards
+
+    main(image_directory, annotations_directory, output_path_training_split, output_path_validation_split,
+         output_path_test_split,
+         label_map_path, number_of_shards)
