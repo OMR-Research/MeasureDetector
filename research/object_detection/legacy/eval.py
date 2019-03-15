@@ -83,8 +83,8 @@ FLAGS = flags.FLAGS
 @tf.contrib.framework.deprecated(None, 'Use object_detection/model_main.py.')
 def main(unused_argv):
   # Use the following lines to potentially restrict the training process to only 30% of the GPU V-RAM
-  gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.3)
-  sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
+  #gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.3)
+  #sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 
   assert FLAGS.checkpoint_dir, '`checkpoint_dir` is missing.'
   assert FLAGS.eval_dir, '`eval_dir` is missing.'
