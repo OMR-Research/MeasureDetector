@@ -70,8 +70,8 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
                               ("staves", "stave")]
             for class_name, instance_name in object_classes:
                 for bounding_box in data[class_name]:
-                    left, top, bottom, right = bounding_box["left"], bounding_box["top"], bounding_box["bottom"], \
-                                               bounding_box["right"]
+                    left, top, right, bottom = bounding_box["left"], bounding_box["top"], bounding_box["right"], \
+                                               bounding_box["bottom"]
 
                     xmin.append(float(left) / width)
                     ymin.append(float(top) / height)
@@ -79,6 +79,12 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
                     ymax.append(float(bottom) / height)
                     classes.append(label_map_dict[instance_name])
                     classes_text.append(instance_name.encode('utf8'))
+
+                    assert (left < right)
+                    assert (top < bottom)
+                    assert (right <= width)
+                    assert (bottom <= height)
+                    assert (left > 0 and right > 0 and top > 0 and bottom > 0)
 
             example = tf.train.Example(features=tf.train.Features(feature={
                 'image/height': dataset_util.int64_feature(height),
@@ -105,7 +111,6 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
 
         except Exception as ex:
             print(f"Skipping image, that caused an error {path_to_image}.\n{ex}")
-            pass
 
 
 def get_training_validation_test_indices(all_image_paths):
