@@ -10,9 +10,11 @@ $env:PYTHONPATH = "$($pathToGitRoot);$($pathToGitRoot)/research;$($pathToGitRoot
 ################################################################
 # Available configurations - uncomment the one to actually run #
 ################################################################
-# $configuration = "ssd_resnet50_v1_fpn_shared_box_predictor_640x640_edirom"
-# $configuration = "faster_rcnn_inception_v2_edirom"
-$configuration = "faster_rcnn_inception_resnet_v2_atrous_muscima_pp"
+#$configuration = "ssd_resnet50_v1_fpn_shared_box_predictor_640x640_edirom"
+#$configuration = "faster_rcnn_inception_v2_edirom"
+#$configuration = "faster_rcnn_inception_resnet_v2_atrous_muscima_pp"
+#$configuration = "ssdlite_mobilenet_v2_muscima_pp"
+$configuration = "faster_rcnn_inception_resnet_v2_atrous_edirom"
 
 echo "Validate with $($configuration) configuration"
 

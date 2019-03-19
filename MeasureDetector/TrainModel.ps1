@@ -15,7 +15,8 @@ $env:PYTHONPATH = "$($pathToGitRoot);$($pathToGitRoot)/research;$($pathToGitRoot
 #$configuration = "faster_rcnn_inception_v2_edirom"
 #$configuration = "faster_rcnn_inception_resnet_v2_atrous_edirom"
 #$configuration = "faster_rcnn_inception_v2_muscima_pp"
-$configuration = "faster_rcnn_inception_resnet_v2_atrous_muscima_pp"
+#$configuration = "faster_rcnn_inception_resnet_v2_atrous_muscima_pp"
+$configuration = "ssdlite_mobilenet_v2_muscima_pp"
 
 echo "Training with $($configuration) configuration"
 
