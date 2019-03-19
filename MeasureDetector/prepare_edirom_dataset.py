@@ -11,7 +11,7 @@ if __name__ == "__main__":
     parser.add_argument('-url', dest='url', type=str, required=True,
                         help='URL where to download the dataset from. Must be provided manual to prevent automatic '
                              'crawling. Please contact the authors if you want to know the URLs.')
-    parser.add_argument("--dataset_directory", type=str, default="data",
+    parser.add_argument("--dataset_directory", type=str, default="data/edirom",
                         help="The directory, where the extracted dataset will be copied to")
 
     flags = parser.parse_args()
