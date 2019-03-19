@@ -66,8 +66,10 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
             with open(path_to_annotations, 'r') as gt_file:
                 data = json.load(gt_file)
 
-            object_classes = [("system_measures", "system_measure"), ("stave_measures", "stave_measure"),
-                              ("staves", "stave")]
+            object_classes = [("system_measures", "system_measure"),
+                              # ("stave_measures", "stave_measure"),
+                              # ("staves", "stave")
+                              ]
             for class_name, instance_name in object_classes:
                 for bounding_box in data[class_name]:
                     left, top, right, bottom = bounding_box["left"], bounding_box["top"], bounding_box["right"], \
@@ -138,10 +140,21 @@ def main(image_directory: str, annotation_directory: str, output_path_training_s
     all_image_paths = all_jpg_image_paths + all_png_image_paths
     all_annotation_paths = glob(f"{annotation_directory}/**/*.json", recursive=True)
 
+    # Filter out the dataset.json files, which are complete dataset annotations
+    all_annotation_paths = [a for a in all_annotation_paths if "dataset.json" not in a]
+
     training_sample_indices, validation_sample_indices, test_sample_indices = get_training_validation_test_indices(
         all_image_paths)
 
-    assert (len(all_image_paths) == len(all_annotation_paths))
+    all_annotation_paths = sorted(all_annotation_paths)
+    all_image_paths = sorted(all_image_paths)
+
+    if len(all_image_paths) != len(all_annotation_paths):
+        print("Not every image has annotations")
+
+    for annotation_path, image_path in zip(all_annotation_paths, all_image_paths):
+        if os.path.splitext(os.path.basename(image_path))[0] not in annotation_path:
+            print("Invalid annotations detected: {0}, {1}".format(image_path, annotation_path))
 
     with contextlib2.ExitStack() as tf_record_close_stack:
         training_tf_records = tf_record_creation_util.open_sharded_output_tfrecords(
@@ -170,19 +183,19 @@ def main(image_directory: str, annotation_directory: str, output_path_training_s
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Creates a tensorflow record from an existing dataset')
-    parser.add_argument('-image_directory', type=str, default="data/muscima_pp/v1.0/data/images",
+    parser.add_argument('-image_directory', type=str, default="data",
                         help='Directory, where the images are stored')
-    parser.add_argument('-annotation_directory', type=str, default="data/muscima_pp/v1.0/data/json",
+    parser.add_argument('-annotation_directory', type=str, default="data",
                         help='Directory, where the annotations are stored')
-    parser.add_argument('-output_path_training_split', type=str, default="data/muscima_pp/training.record",
+    parser.add_argument('-output_path_training_split', type=str, default="data/training.record",
                         help='Path to output TFRecord')
-    parser.add_argument('-output_path_validation_split', type=str, default="data/muscima_pp/validation.record",
+    parser.add_argument('-output_path_validation_split', type=str, default="data/validation.record",
                         help='Path to output TFRecord')
-    parser.add_argument('-output_path_test_split', type=str, default="data/muscima_pp/test.record",
+    parser.add_argument('-output_path_test_split', type=str, default="data/test.record",
                         help='Path to output TFRecord')
     parser.add_argument('-label_map_path', type=str, default='mapping.txt',
                         help='Path to label map proto.txt')
-    parser.add_argument('-num_shards', type=int, default=1, help='Number of TFRecord shards')
+    parser.add_argument('-num_shards', type=int, default=40, help='Number of TFRecord shards')
 
     flags = parser.parse_args()
     image_directory = flags.image_directory
