@@ -8,12 +8,6 @@ from PIL import Image
 from object_detection.utils import ops as utils_ops, label_map_util, visualization_utils as vis_util
 
 
-def load_image_into_numpy_array(image):
-    (im_width, im_height) = image.size
-    return np.array(image.getdata()).reshape(
-        (im_height, im_width, 3)).astype(np.uint8)
-
-
 def run_inference_for_single_image(image, graph):
     with graph.as_default():
         with tf.Session() as sess:
@@ -112,7 +106,7 @@ if __name__ == "__main__":
 
     # the array based representation of the image will be used later in order to prepare the
     # result image with boxes and labels on it.
-    image_np = load_image_into_numpy_array(image)
+    image_np = np.array(image)
 
     # Actual detection.
     output_dict = run_inference_for_single_image(image_np, detection_graph)
