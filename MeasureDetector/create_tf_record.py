@@ -11,6 +11,7 @@ import contextlib2
 import tensorflow as tf
 from typing import List, Dict, Generator
 
+from PIL.Image import Image
 from object_detection.dataset_tools import tf_record_creation_util
 from object_detection.utils import dataset_util
 from object_detection.utils import label_map_util
@@ -30,6 +31,8 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
     """
 
     total_number_of_images = len(all_image_paths)
+    number_of_skipped_or_errored_samples = 0
+    error_messages = []
     for index in tqdm(range(total_number_of_images), desc="Serializing annotations", total=total_number_of_images):
         path_to_image, path_to_annotations = all_image_paths[index], all_annotation_paths[index]
 
@@ -40,13 +43,18 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
             with tf.gfile.GFile(path_to_image, 'rb') as fid:
                 encoded_image = fid.read()
             encoded_image_io = io.BytesIO(encoded_image)
-            image = PIL.Image.open(encoded_image_io)
+            image = PIL.Image.open(encoded_image_io)  # type: Image
+            # Force loading of the image to test if it is a valid image
+            image.load()
             if image.format != 'JPEG' and image.format != 'PNG':
-                print(
-                    f"Skipping image, that is neither jpeg nor png and probably does not belong to the project {path_to_image}.")
+                error_messages.append(
+                    f"Skipped image {path_to_image} that is neither jpeg nor png and probably does not belong to the project.")
+                number_of_skipped_or_errored_samples += 1
                 continue
             if image.width < 600 or image.height < 600:
-                print(f"Skipping image, that is smaller than 600x600 and might cause issues {path_to_image}.")
+                error_messages.append(
+                    f"Skipped image {path_to_image} that is smaller than 600x600 and might cause issues.")
+                number_of_skipped_or_errored_samples += 1
                 continue
             key = hashlib.sha256(encoded_image).hexdigest()
 
@@ -112,7 +120,12 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
             yield example
 
         except Exception as ex:
-            print(f"Skipping image, that caused an error {path_to_image}.\n{ex}")
+            error_messages.append(f"Skipped image {path_to_image} that caused an error: {ex}")
+            number_of_skipped_or_errored_samples += 1
+
+    print("Skipped {0} samples".format(number_of_skipped_or_errored_samples))
+    for sample in error_messages:
+        print(sample)
 
 
 def get_training_validation_test_indices(all_image_paths):
@@ -195,7 +208,7 @@ if __name__ == '__main__':
                         help='Path to output TFRecord')
     parser.add_argument('-label_map_path', type=str, default='mapping.txt',
                         help='Path to label map proto.txt')
-    parser.add_argument('-num_shards', type=int, default=40, help='Number of TFRecord shards')
+    parser.add_argument('-num_shards', type=int, default=6, help='Number of TFRecord shards')
 
     flags = parser.parse_args()
     image_directory = flags.image_directory
