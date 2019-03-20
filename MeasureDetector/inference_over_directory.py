@@ -41,10 +41,9 @@ if __name__ == "__main__":
                         help='Path to the output directory, that will contain the results.')
     parser.add_argument('--show_scores', dest='show_scores', type=bool, default=True)
     parser.add_argument('--show_labels', dest='show_labels', type=bool, default=True)
-    parser.add_argument('--batch_size', dest='batch_size', type=int, default=1,
-                        help='Number of images per batch. If all images have the same size, you may increase this'
-                             'number for faster processing. Otherwise go with batch-size 1 which permits different'
-                             'image dimensions.')
+    parser.add_argument('--max_batch_size', dest='max_batch_size', type=int, default=15,
+                        help='Maximum number of images per batch. Only images of the same dimensions will be batched.'
+                             'If images have different dimensions, they will be processed individually.')
     parser.add_argument('--score_threshold', dest='score_threshold', type=float, default=0.5)
     args = parser.parse_args()
 
@@ -60,7 +59,7 @@ if __name__ == "__main__":
     show_scores = args.show_scores
     show_labels = args.show_labels
     score_threshold = args.score_threshold
-    batch_size = args.batch_size
+    max_batch_size = args.max_batch_size
 
     start_time = time()
 
@@ -95,7 +94,9 @@ if __name__ == "__main__":
             image_dimensions_for_batch = []
             input_files_for_batch = []
             detections_list = []
-            for input_file in tqdm(input_files, desc="Detecting objects"):
+            images_have_same_dimensions_for_batching = True
+            for input_file_index in tqdm(range(len(input_files)), desc="Detecting objects"):
+                input_file = input_files[input_file_index]
                 try:
                     image = Image.open(input_file).convert("RGB")
                     image_width, image_height = image.size
@@ -108,14 +109,21 @@ if __name__ == "__main__":
                 images_for_batch.append(np.expand_dims(image_np, 0))
                 input_files_for_batch.append(input_file)
 
+                if input_file_index < len(input_files) - 1:
+                    image_dimensions_of_next_image = Image.open(input_files[input_file_index + 1]).size
+                    if image.size != image_dimensions_of_next_image:
+                        images_have_same_dimensions_for_batching = False
+
                 index_for_batch += 1
-                if index_for_batch != batch_size:
+                if index_for_batch < max_batch_size and images_have_same_dimensions_for_batching:
                     continue
+                number_of_images_in_batch = index_for_batch
                 index_for_batch = 0
+                images_have_same_dimensions_for_batching = True
 
                 outputs_dict = run_inference_for_image_batch(images_for_batch, sess, tensor_dict)
 
-                for index in range(0, batch_size):
+                for index in range(0, number_of_images_in_batch):
                     per_file_detections_list = []
                     image_np = np.squeeze(images_for_batch[index], axis=0)
                     # Visualization of the results of a detection.
