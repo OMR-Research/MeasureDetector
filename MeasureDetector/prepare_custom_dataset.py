@@ -44,7 +44,9 @@ def convert_annotations_to_one_json_file_per_image(dataset_directory: str):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Downloads a dataset from the Edirom system')
+    parser = argparse.ArgumentParser(description='Prepare single-file annotations. Seaches the given directory '
+                                                 'recursively for dataset.json files that will be extracted into'
+                                                 'plain json annotation files, one file per image.')
     parser.add_argument("--dataset_directory", type=str, default="data/weber",
                         help="The directory, where the extracted dataset resides")
 
