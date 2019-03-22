@@ -196,19 +196,19 @@ def main(image_directory: str, annotation_directory: str, output_path_training_s
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Creates a tensorflow record from an existing dataset')
-    parser.add_argument('-image_directory', type=str, default="data",
+    parser.add_argument('--image_directory', type=str, default="data",
                         help='Directory, where the images are stored')
-    parser.add_argument('-annotation_directory', type=str, default="data",
+    parser.add_argument('--annotation_directory', type=str, default="data",
                         help='Directory, where the annotations are stored')
-    parser.add_argument('-output_path_training_split', type=str, default="data/training.record",
+    parser.add_argument('--output_path_training_split', type=str, default="data/training.record",
                         help='Path to output TFRecord')
-    parser.add_argument('-output_path_validation_split', type=str, default="data/validation.record",
+    parser.add_argument('--output_path_validation_split', type=str, default="data/validation.record",
                         help='Path to output TFRecord')
-    parser.add_argument('-output_path_test_split', type=str, default="data/test.record",
+    parser.add_argument('--output_path_test_split', type=str, default="data/test.record",
                         help='Path to output TFRecord')
-    parser.add_argument('-label_map_path', type=str, default='mapping.txt',
+    parser.add_argument('--label_map_path', type=str, default='mapping.txt',
                         help='Path to label map proto.txt')
-    parser.add_argument('-num_shards', type=int, default=6, help='Number of TFRecord shards')
+    parser.add_argument('--num_shards', type=int, default=4, help='Number of TFRecord shards')
 
     flags = parser.parse_args()
     image_directory = flags.image_directory
