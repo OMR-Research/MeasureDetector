@@ -12,10 +12,96 @@ import tensorflow as tf
 from typing import List, Dict, Generator
 
 from PIL.Image import Image
+
+from MeasureDetector.errors import InvalidImageFormatError, InvalidImageError, InvalidAnnotationError
 from object_detection.dataset_tools import tf_record_creation_util
 from object_detection.utils import dataset_util
 from object_detection.utils import label_map_util
 from tqdm import tqdm
+
+
+def encode_sample_into_tensorflow_sample(path_to_image: str, path_to_annotations: str, label_map_dict: Dict[str, int]):
+    with tf.gfile.GFile(path_to_image, 'rb') as fid:
+        encoded_image = fid.read()
+    encoded_image_io = io.BytesIO(encoded_image)
+    image = PIL.Image.open(encoded_image_io)  # type: Image
+
+    # Force loading of the image to test if it is a valid image
+    try:
+        image.load()
+    except Exception as ex:
+        raise InvalidImageError("Could not load image.", ex)
+    if image.format != 'JPEG' and image.format != 'PNG':
+        raise InvalidImageFormatError(
+            f"Skipped image {path_to_image} that is neither jpeg nor png and probably does not belong to the project.")
+    if image.width < 600 or image.height < 600:
+        raise InvalidImageError(f"Skipped image {path_to_image} that is smaller than 600x600 and might cause issues.")
+    key = hashlib.sha256(encoded_image).hexdigest()
+
+    image_width = image.width
+    image_height = image.height
+
+    xmin = []
+    ymin = []
+    xmax = []
+    ymax = []
+    classes = []
+    classes_text = []
+    truncated = []
+    poses = []
+    difficult_obj = []
+
+    with open(path_to_annotations, 'r') as gt_file:
+        data = json.load(gt_file)
+
+    object_classes = [("system_measures", "system_measure"),
+                      # ("stave_measures", "stave_measure"),
+                      # ("staves", "stave")
+                      ]
+    for class_name, instance_name in object_classes:
+        for bounding_box in data[class_name]:
+            left, top, right, bottom = bounding_box["left"], bounding_box["top"], bounding_box["right"], \
+                                       bounding_box["bottom"]
+
+            xmin.append(float(left) / image_width)
+            ymin.append(float(top) / image_height)
+            xmax.append(float(right) / image_width)
+            ymax.append(float(bottom) / image_height)
+            classes.append(label_map_dict[instance_name])
+            classes_text.append(instance_name.encode('utf8'))
+
+            if left >= right:
+                raise InvalidAnnotationError("Invalid annotation: Left must be smaller than right")
+            if (top >= bottom):
+                raise InvalidAnnotationError("Invalid annotation: Top must be smaller than bottom")
+            if (right > image_width):
+                raise InvalidAnnotationError("Invalid annotation: Right boundary must be within image width")
+            if (bottom > image_height):
+                raise InvalidAnnotationError("Invalid annotation: Bottom boundary must be within image height")
+            if (left < 0 and right < 0 and top < 0 and bottom < 0):
+                raise InvalidAnnotationError("Invalid annotation: Annotations must not be negative")
+
+    example = tf.train.Example(features=tf.train.Features(feature={
+        'image/height': dataset_util.int64_feature(image_height),
+        'image/width': dataset_util.int64_feature(image_width),
+        'image/filename': dataset_util.bytes_feature(
+            path_to_image.encode('utf8')),
+        'image/source_id': dataset_util.bytes_feature(
+            path_to_image.encode('utf8')),
+        'image/key/sha256': dataset_util.bytes_feature(key.encode('utf8')),
+        'image/encoded': dataset_util.bytes_feature(encoded_image),
+        'image/format': dataset_util.bytes_feature(image.format.lower().encode('utf8')),
+        'image/object/bbox/xmin': dataset_util.float_list_feature(xmin),
+        'image/object/bbox/xmax': dataset_util.float_list_feature(xmax),
+        'image/object/bbox/ymin': dataset_util.float_list_feature(ymin),
+        'image/object/bbox/ymax': dataset_util.float_list_feature(ymax),
+        'image/object/class/text': dataset_util.bytes_list_feature(classes_text),
+        'image/object/class/label': dataset_util.int64_list_feature(classes),
+        'image/object/difficult': dataset_util.int64_list_feature(difficult_obj),
+        'image/object/truncated': dataset_util.int64_list_feature(truncated),
+        'image/object/view': dataset_util.bytes_list_feature(poses),
+    }))
+    return example
 
 
 def annotations_to_tf_example_list(all_image_paths: List[str],
@@ -40,83 +126,7 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
                 os.path.splitext(os.path.basename(path_to_annotations))[0])
 
         try:
-            with tf.gfile.GFile(path_to_image, 'rb') as fid:
-                encoded_image = fid.read()
-            encoded_image_io = io.BytesIO(encoded_image)
-            image = PIL.Image.open(encoded_image_io)  # type: Image
-            # Force loading of the image to test if it is a valid image
-            image.load()
-            if image.format != 'JPEG' and image.format != 'PNG':
-                error_messages.append(
-                    f"Skipped image {path_to_image} that is neither jpeg nor png and probably does not belong to the project.")
-                number_of_skipped_or_errored_samples += 1
-                continue
-            if image.width < 600 or image.height < 600:
-                error_messages.append(
-                    f"Skipped image {path_to_image} that is smaller than 600x600 and might cause issues.")
-                number_of_skipped_or_errored_samples += 1
-                continue
-            key = hashlib.sha256(encoded_image).hexdigest()
-
-            width = image.width
-            height = image.height
-
-            xmin = []
-            ymin = []
-            xmax = []
-            ymax = []
-            classes = []
-            classes_text = []
-            truncated = []
-            poses = []
-            difficult_obj = []
-
-            with open(path_to_annotations, 'r') as gt_file:
-                data = json.load(gt_file)
-
-            object_classes = [("system_measures", "system_measure"),
-                              # ("stave_measures", "stave_measure"),
-                              # ("staves", "stave")
-                              ]
-            for class_name, instance_name in object_classes:
-                for bounding_box in data[class_name]:
-                    left, top, right, bottom = bounding_box["left"], bounding_box["top"], bounding_box["right"], \
-                                               bounding_box["bottom"]
-
-                    xmin.append(float(left) / width)
-                    ymin.append(float(top) / height)
-                    xmax.append(float(right) / width)
-                    ymax.append(float(bottom) / height)
-                    classes.append(label_map_dict[instance_name])
-                    classes_text.append(instance_name.encode('utf8'))
-
-                    assert (left < right)
-                    assert (top < bottom)
-                    assert (right <= width)
-                    assert (bottom <= height)
-                    assert (left > 0 and right > 0 and top > 0 and bottom > 0)
-
-            example = tf.train.Example(features=tf.train.Features(feature={
-                'image/height': dataset_util.int64_feature(height),
-                'image/width': dataset_util.int64_feature(width),
-                'image/filename': dataset_util.bytes_feature(
-                    path_to_image.encode('utf8')),
-                'image/source_id': dataset_util.bytes_feature(
-                    path_to_image.encode('utf8')),
-                'image/key/sha256': dataset_util.bytes_feature(key.encode('utf8')),
-                'image/encoded': dataset_util.bytes_feature(encoded_image),
-                'image/format': dataset_util.bytes_feature(image.format.lower().encode('utf8')),
-                'image/object/bbox/xmin': dataset_util.float_list_feature(xmin),
-                'image/object/bbox/xmax': dataset_util.float_list_feature(xmax),
-                'image/object/bbox/ymin': dataset_util.float_list_feature(ymin),
-                'image/object/bbox/ymax': dataset_util.float_list_feature(ymax),
-                'image/object/class/text': dataset_util.bytes_list_feature(classes_text),
-                'image/object/class/label': dataset_util.int64_list_feature(classes),
-                'image/object/difficult': dataset_util.int64_list_feature(difficult_obj),
-                'image/object/truncated': dataset_util.int64_list_feature(truncated),
-                'image/object/view': dataset_util.bytes_list_feature(poses),
-            }))
-
+            example = encode_sample_into_tensorflow_sample(path_to_image, path_to_annotations, label_map_dict)
             yield example
 
         except Exception as ex:
@@ -169,6 +179,11 @@ def main(image_directory: str, annotation_directory: str, output_path_training_s
         if os.path.splitext(os.path.basename(image_path))[0] not in annotation_path:
             print("Invalid annotations detected: {0}, {1}".format(image_path, annotation_path))
 
+    print(f"Exporting\n"
+          f"- {len(training_sample_indices)} training samples\n"
+          f"- {len(validation_sample_indices)} validation samples\n"
+          f"- {len(test_sample_indices)} test samples")
+
     with contextlib2.ExitStack() as tf_record_close_stack:
         training_tf_records = tf_record_creation_util.open_sharded_output_tfrecords(
             tf_record_close_stack, output_path_training_split, number_of_shards)
@@ -188,14 +203,13 @@ def main(image_directory: str, annotation_directory: str, output_path_training_s
             elif index in test_sample_indices:
                 test_tf_records[shard_index].write(tf_example.SerializeToString())
 
-    print(f"Exported into\n"
-          f"- {len(training_sample_indices)} training samples\n"
-          f"- {len(validation_sample_indices)} validation samples\n"
-          f"- {len(test_sample_indices)} test samples")
-
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Creates a tensorflow record from an existing dataset')
+    parser = argparse.ArgumentParser(description='Creates a tensorflow record from an existing dataset.'
+                                                 'Recursively searchers the image- and annotation-directories'
+                                                 'for png/jpg files and json files respectively. One json-file'
+                                                 'per image has to be stored in the folders, where the filenames'
+                                                 'must match, except for the file-ending.')
     parser.add_argument('--image_directory', type=str, default="data",
                         help='Directory, where the images are stored')
     parser.add_argument('--annotation_directory', type=str, default="data",
