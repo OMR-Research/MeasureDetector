@@ -110,8 +110,11 @@ if __name__ == "__main__":
                 input_files_for_batch.append(input_file)
 
                 if input_file_index < len(input_files) - 1:
-                    image_dimensions_of_next_image = Image.open(input_files[input_file_index + 1]).size
-                    if image.size != image_dimensions_of_next_image:
+                    try:
+                        image_dimensions_of_next_image = Image.open(input_files[input_file_index + 1]).size
+                        if image.size != image_dimensions_of_next_image:
+                            images_have_same_dimensions_for_batching = False
+                    except:
                         images_have_same_dimensions_for_batching = False
 
                 index_for_batch += 1
