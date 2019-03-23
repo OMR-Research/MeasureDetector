@@ -20,7 +20,7 @@ from object_detection.utils import label_map_util
 from tqdm import tqdm
 
 
-def encode_sample_into_tensorflow_sample(path_to_image: str, path_to_annotations: str, label_map_dict: Dict[str, int]):
+def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, label_map_dict: Dict[str, int]):
     with tf.gfile.GFile(path_to_image, 'rb') as fid:
         encoded_image = fid.read()
     encoded_image_io = io.BytesIO(encoded_image)
@@ -51,15 +51,12 @@ def encode_sample_into_tensorflow_sample(path_to_image: str, path_to_annotations
     poses = []
     difficult_obj = []
 
-    with open(path_to_annotations, 'r') as gt_file:
-        data = json.load(gt_file)
-
     object_classes = [("system_measures", "system_measure"),
                       # ("stave_measures", "stave_measure"),
                       # ("staves", "stave")
                       ]
     for class_name, instance_name in object_classes:
-        for bounding_box in data[class_name]:
+        for bounding_box in annotations[class_name]:
             left, top, right, bottom = bounding_box["left"], bounding_box["top"], bounding_box["right"], \
                                        bounding_box["bottom"]
 
@@ -126,7 +123,10 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
                 os.path.splitext(os.path.basename(path_to_annotations))[0])
 
         try:
-            example = encode_sample_into_tensorflow_sample(path_to_image, path_to_annotations, label_map_dict)
+            with open(path_to_annotations, 'r') as gt_file:
+                annotations = json.load(gt_file)
+
+            example = encode_sample_into_tensorflow_sample(path_to_image, annotations, label_map_dict)
             yield example
 
         except Exception as ex:

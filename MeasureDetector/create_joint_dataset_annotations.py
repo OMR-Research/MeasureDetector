@@ -142,15 +142,17 @@ def split_dataset_annotations_into_train_validation_test(validation_percentage: 
             validation_samples = [samples[i] for i in validation_sample_indices]
             test_samples = [samples[i] for i in test_sample_indices]
 
-            training_dataset[engraving_type][number_of_staves].append(training_samples)
-            validation_dataset[engraving_type][number_of_staves].append(validation_samples)
-            test_dataset[engraving_type][number_of_staves].append(test_samples)
+            training_dataset[engraving_type][number_of_staves].extend(training_samples)
+            validation_dataset[engraving_type][number_of_staves].extend(validation_samples)
+            test_dataset[engraving_type][number_of_staves].extend(test_samples)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Creates one large json-file for the entire available dataset')
     parser.add_argument("--dataset_directory", type=str, default="data",
-                        help="The directory, where the extracted dataset resides")
+                        help="The directory, where the extracted dataset resides. Directories will be crawled for "
+                             "files called dataset.json. The directory for MUSCIMA++ is assumed 'muscima_pp' and "
+                             "annotations will be loaded on a per-file base instead of from a ")
 
     flags = parser.parse_args()
     dataset_directory = flags.dataset_directory

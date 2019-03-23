@@ -95,6 +95,18 @@ For working with an Edirom dataset, you have to download that dataset first with
  
  ![](MeasureDetector/samples/A1-02_annotated.jpg)
  
+ 
+ Steps for preparing the TF-Record:
+ 
+```
+python create_joint_dataset_annotations.py --dataset_directory MeasureDetectionDataset
+python create_tf_record_from_joint_dataset.py --annotation_directory MeasureDetectionDataset --annotation_filename training_joint_dataset.json --output_path MeasureDetectionDataset\training.record --target_size=5000
+python create_tf_record_from_joint_dataset.py --annotation_directory MeasureDetectionDataset --annotation_filename validation_joint_dataset.json --output_path MeasureDetectionDataset\validation.record --target_size=500
+python create_tf_record_from_joint_dataset.py --annotation_directory MeasureDetectionDataset --annotation_filename test_joint_dataset.json --output_path MeasureDetectionDataset\test.record --target_size=500
+```
+ 
+Those scripts will automatically sub-sample the dataset to be equally drawn from the categories [Handwritten, Typeset] x [No staves, One stave, Two staves, Three staves, More staves] until the target size is reached. That means, individual samples can be represented multiple times in the record.
+ 
 # Running the training
 
 ## Adjusting paths
