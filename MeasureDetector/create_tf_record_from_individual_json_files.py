@@ -60,6 +60,17 @@ def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, 
             left, top, right, bottom = bounding_box["left"], bounding_box["top"], bounding_box["right"], \
                                        bounding_box["bottom"]
 
+            if left >= right:
+                continue
+            if top >= bottom:
+                continue
+            if right > image_width:
+                right = image_width
+            if bottom > image_height:
+                bottom = image_height
+            if left < 0 or right < 0 or top < 0 or bottom < 0:
+                continue
+
             xmin.append(float(left) / image_width)
             ymin.append(float(top) / image_height)
             xmax.append(float(right) / image_width)
@@ -67,16 +78,6 @@ def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, 
             classes.append(label_map_dict[instance_name])
             classes_text.append(instance_name.encode('utf8'))
 
-            if left >= right:
-                raise InvalidAnnotationError("Invalid annotation: Left must be smaller than right")
-            if (top >= bottom):
-                raise InvalidAnnotationError("Invalid annotation: Top must be smaller than bottom")
-            if (right > image_width):
-                raise InvalidAnnotationError("Invalid annotation: Right boundary must be within image width")
-            if (bottom > image_height):
-                raise InvalidAnnotationError("Invalid annotation: Bottom boundary must be within image height")
-            if (left < 0 and right < 0 and top < 0 and bottom < 0):
-                raise InvalidAnnotationError("Invalid annotation: Annotations must not be negative")
 
     example = tf.train.Example(features=tf.train.Features(feature={
         'image/height': dataset_util.int64_feature(image_height),
