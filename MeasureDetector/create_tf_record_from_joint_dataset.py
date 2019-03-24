@@ -23,13 +23,21 @@ from tqdm import tqdm
 sampling_categories = [
     ("handwritten", "0"),
     ("handwritten", "1"),
+    ("handwritten", "1"),
+    ("handwritten", "2"),
     ("handwritten", "2"),
     ("handwritten", "3"),
+    ("handwritten", "3"),
+    ("handwritten", "more"),
     ("handwritten", "more"),
     ("typeset", "0"),
     ("typeset", "1"),
+    ("typeset", "1"),
+    ("typeset", "2"),
     ("typeset", "2"),
     ("typeset", "3"),
+    ("typeset", "3"),
+    ("typeset", "more"),
     ("typeset", "more"),
 ]
 
@@ -77,11 +85,12 @@ def main(annotations_directory: str, annotations_filename: str, output_path: str
     with open(os.path.join(annotations_directory, annotations_filename), 'r') as file:
         dataset = json.load(file)
 
+    samples_in_dataset = []
+
     with contextlib2.ExitStack() as tf_record_close_stack:
         tf_record = tf_record_creation_util.open_sharded_output_tfrecords(tf_record_close_stack,
                                                                           output_path,
                                                                           number_of_shards)
-
         for index in tqdm(range(target_size), desc="Serializing annotations", total=target_size):
             current_engraving, number_of_staves = sampling_categories[index % len(sampling_categories)]
             all_items_in_category = dataset[current_engraving][number_of_staves]
@@ -89,14 +98,30 @@ def main(annotations_directory: str, annotations_filename: str, output_path: str
             encoding_succeeded = False
             while not encoding_succeeded:
                 try:
-                    random_sample = random.choice(all_items_in_category)
+                    random_sample = attempt_to_find_sample_that_is_not_yet_in_dataset(all_items_in_category,
+                                                                                      samples_in_dataset)
                     tf_example = encode_sample_into_tensorflow_sample(random_sample["path"], random_sample, label_map_dict)
                     encoding_succeeded = True
+                    samples_in_dataset.append(random_sample['path'])
                 except Exception as ex:
                     error_messages.append(f"Skipped image {random_sample['path']} that caused an error: {ex}")
 
             shard_index = index % number_of_shards
             tf_record[shard_index].write(tf_example.SerializeToString())
+
+    samples_in_dataset.sort()
+    unique_samples_in_dataset = set(samples_in_dataset)
+    print(f"Dataset contains {len(samples_in_dataset)} samples ({len(unique_samples_in_dataset)} of them are unique).")
+
+
+def attempt_to_find_sample_that_is_not_yet_in_dataset(all_items_in_category, already_used_sample_paths):
+    fresh_samples = [sample for sample in all_items_in_category if sample['path'] not in already_used_sample_paths]
+
+    all_samples_already_used = len(fresh_samples) == 0
+    if all_samples_already_used:
+        return random.choice(all_items_in_category)
+
+    return random.choice(fresh_samples)
 
 
 if __name__ == '__main__':
@@ -112,7 +137,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_shards', type=int, default=4, help='Number of TFRecord shards')
     parser.add_argument('--target_size', type=int, default=5000, help='Number of samples to randomly sample from the'
                                                                       'annotations to be added to the TFRecord.')
-
+    random.seed(0)
     flags = parser.parse_args()
     annotations_directory = flags.annotation_directory
     annotations_filename = flags.annotation_filename
