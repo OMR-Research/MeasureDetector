@@ -86,6 +86,7 @@ def main(annotations_directory: str, annotations_filename: str, output_path: str
         dataset = json.load(file)
 
     samples_in_dataset = []
+    samples_that_caused_errors = []
 
     with contextlib2.ExitStack() as tf_record_close_stack:
         tf_record = tf_record_creation_util.open_sharded_output_tfrecords(tf_record_close_stack,
@@ -99,11 +100,14 @@ def main(annotations_directory: str, annotations_filename: str, output_path: str
             while not encoding_succeeded:
                 try:
                     random_sample = attempt_to_find_sample_that_is_not_yet_in_dataset(all_items_in_category,
-                                                                                      samples_in_dataset)
-                    tf_example = encode_sample_into_tensorflow_sample(random_sample["path"], random_sample, label_map_dict)
+                                                                                      samples_in_dataset,
+                                                                                      samples_that_caused_errors)
+                    tf_example = encode_sample_into_tensorflow_sample(random_sample["path"], random_sample,
+                                                                      label_map_dict)
                     encoding_succeeded = True
                     samples_in_dataset.append(random_sample['path'])
                 except Exception as ex:
+                    samples_that_caused_errors.append(random_sample['path'])
                     error_messages.append(f"Skipped image {random_sample['path']} that caused an error: {ex}")
 
             shard_index = index % number_of_shards
@@ -114,8 +118,10 @@ def main(annotations_directory: str, annotations_filename: str, output_path: str
     print(f"Dataset contains {len(samples_in_dataset)} samples ({len(unique_samples_in_dataset)} of them are unique).")
 
 
-def attempt_to_find_sample_that_is_not_yet_in_dataset(all_items_in_category, already_used_sample_paths):
-    fresh_samples = [sample for sample in all_items_in_category if sample['path'] not in already_used_sample_paths]
+def attempt_to_find_sample_that_is_not_yet_in_dataset(all_items_in_category, already_used_sample_paths,
+                                                      samples_to_ignore):
+    fresh_samples = [sample for sample in all_items_in_category if
+                     sample['path'] not in already_used_sample_paths and sample['path'] not in samples_to_ignore]
 
     all_samples_already_used = len(fresh_samples) == 0
     if all_samples_already_used:
