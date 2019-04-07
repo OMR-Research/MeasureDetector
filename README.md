@@ -100,9 +100,9 @@ For working with an Edirom dataset, you have to download that dataset first with
  
 ```
 python create_joint_dataset_annotations.py --dataset_directory MeasureDetectionDataset
-python create_tf_record_from_joint_dataset.py --annotation_directory MeasureDetectionDataset --annotation_filename training_joint_dataset.json --output_path MeasureDetectionDataset\training.record --target_size=5000
-python create_tf_record_from_joint_dataset.py --annotation_directory MeasureDetectionDataset --annotation_filename validation_joint_dataset.json --output_path MeasureDetectionDataset\validation.record --target_size=500
-python create_tf_record_from_joint_dataset.py --annotation_directory MeasureDetectionDataset --annotation_filename test_joint_dataset.json --output_path MeasureDetectionDataset\test.record --target_size=500
+python create_tf_record_from_joint_dataset.py --annotation_directory MeasureDetectionDataset --annotation_filename training_joint_dataset.json --output_path MeasureDetectionDataset\training.record --target_size=2400 --allow_sample_reuse
+python create_tf_record_from_joint_dataset.py --annotation_directory MeasureDetectionDataset --annotation_filename validation_joint_dataset.json --output_path MeasureDetectionDataset\validation.record --target_size=800
+python create_tf_record_from_joint_dataset.py --annotation_directory MeasureDetectionDataset --annotation_filename test_joint_dataset.json --output_path MeasureDetectionDataset\test.record --target_size=800
 ```
  
 Those scripts will automatically sub-sample the dataset to be equally drawn from the categories [Handwritten, Typeset] x [No staves, One stave, Two staves, Three staves, More staves] until the target size is reached. That means, individual samples can be represented multiple times in the record.

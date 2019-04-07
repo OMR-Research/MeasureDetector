@@ -77,7 +77,7 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
 
 
 def main(annotations_directory: str, annotations_filename: str, output_path: str, label_map_path: str,
-         number_of_shards: int, target_size: int):
+         number_of_shards: int, target_size: int, allow_sample_reuse: bool):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     label_map_dict = label_map_util.get_label_map_dict(label_map_path)
     error_messages = []
@@ -92,26 +92,38 @@ def main(annotations_directory: str, annotations_filename: str, output_path: str
         tf_record = tf_record_creation_util.open_sharded_output_tfrecords(tf_record_close_stack,
                                                                           output_path,
                                                                           number_of_shards)
-        for index in tqdm(range(target_size), desc="Serializing annotations", total=target_size):
-            current_engraving, number_of_staves = sampling_categories[index % len(sampling_categories)]
-            all_items_in_category = dataset[current_engraving][number_of_staves]
+        samples_written = 0
+        index = 0
+        with tqdm(desc="Serializing annotations", total=target_size) as progress_bar:
+            while samples_written < target_size:
+                current_engraving, number_of_staves = sampling_categories[index % len(sampling_categories)]
+                all_items_in_category = dataset[current_engraving][number_of_staves]
 
-            encoding_succeeded = False
-            while not encoding_succeeded:
-                try:
-                    random_sample = attempt_to_find_sample_that_is_not_yet_in_dataset(all_items_in_category,
-                                                                                      samples_in_dataset,
-                                                                                      samples_that_caused_errors)
-                    tf_example = encode_sample_into_tensorflow_sample(random_sample["path"], random_sample,
-                                                                      label_map_dict)
-                    encoding_succeeded = True
-                    samples_in_dataset.append(random_sample['path'])
-                except Exception as ex:
-                    samples_that_caused_errors.append(random_sample['path'])
-                    error_messages.append(f"Skipped image {random_sample['path']} that caused an error: {ex}")
+                encoding_succeeded = False
+                tf_example = None
+                while not encoding_succeeded:
+                    try:
+                        random_sample = attempt_to_find_sample_that_is_not_yet_in_dataset(all_items_in_category,
+                                                                                          samples_in_dataset,
+                                                                                          samples_that_caused_errors,
+                                                                                          allow_sample_reuse)
 
-            shard_index = index % number_of_shards
-            tf_record[shard_index].write(tf_example.SerializeToString())
+                        # If random sample is None, no more samples is available, and reuse is prohibited. Skip it
+                        if random_sample is not None:
+                            tf_example = encode_sample_into_tensorflow_sample(random_sample["path"], random_sample,
+                                                                              label_map_dict)
+                            samples_in_dataset.append(random_sample['path'])
+                        encoding_succeeded = True
+                    except Exception as ex:
+                        samples_that_caused_errors.append(random_sample['path'])
+                        error_messages.append(f"Skipped image {random_sample['path']} that caused an error: {ex}")
+
+                shard_index = index % number_of_shards
+                if tf_example is not None:
+                    tf_record[shard_index].write(tf_example.SerializeToString())
+                    samples_written += 1
+                    progress_bar.update(1)
+                index += 1
 
     samples_in_dataset.sort()
     unique_samples_in_dataset = set(samples_in_dataset)
@@ -119,13 +131,16 @@ def main(annotations_directory: str, annotations_filename: str, output_path: str
 
 
 def attempt_to_find_sample_that_is_not_yet_in_dataset(all_items_in_category, already_used_sample_paths,
-                                                      samples_to_ignore):
+                                                      samples_to_ignore, allow_sample_reuse):
     fresh_samples = [sample for sample in all_items_in_category if
                      sample['path'] not in already_used_sample_paths and sample['path'] not in samples_to_ignore]
 
     all_samples_already_used = len(fresh_samples) == 0
     if all_samples_already_used:
-        return random.choice(all_items_in_category)
+        if allow_sample_reuse:
+            return random.choice(all_items_in_category)
+        else:
+            return None
 
     return random.choice(fresh_samples)
 
@@ -143,6 +158,9 @@ if __name__ == '__main__':
     parser.add_argument('--num_shards', type=int, default=4, help='Number of TFRecord shards')
     parser.add_argument('--target_size', type=int, default=5000, help='Number of samples to randomly sample from the'
                                                                       'annotations to be added to the TFRecord.')
+    parser.add_argument('--allow_sample_reuse', action='store_true',
+                        help='Allow resampling for a balanced dataset')
+
     random.seed(0)
     flags = parser.parse_args()
     annotations_directory = flags.annotation_directory
@@ -151,5 +169,7 @@ if __name__ == '__main__':
     label_map_path = flags.label_map_path
     number_of_shards = flags.num_shards
     target_size = flags.target_size
+    allow_sample_reuse = flags.allow_sample_reuse
 
-    main(annotations_directory, annotations_filename, output_path, label_map_path, number_of_shards, target_size)
+    main(annotations_directory, annotations_filename, output_path, label_map_path, number_of_shards, target_size,
+         allow_sample_reuse)
