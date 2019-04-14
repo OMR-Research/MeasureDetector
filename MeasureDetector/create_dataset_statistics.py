@@ -58,7 +58,7 @@ def create_engraving_statistics(dataset_directory: str):
 
                 number_of_systems_on_this_page = compute_number_of_system_on_page(system_measures)
                 number_of_systems[number_of_systems_on_this_page] += 1
-                individual_results.append((engraving_type, number_of_systems_on_this_page))
+                individual_results.append((engraving_type, number_of_systems_on_this_page, len(system_measures)))
 
     for engraving_type, number_of_pages in engraving_types.items():
         print("Found {0} pages of engraving {1}.".format(number_of_pages, engraving_type))
@@ -67,9 +67,9 @@ def create_engraving_statistics(dataset_directory: str):
         print("Pages with {1} systems: {0}.".format(number_of_systems[index], index))
 
     with open("dataset_statistics.csv", "w") as statistics_file:
-        statistics_file.write("Engraving Type,Number of Systems\n")
+        statistics_file.write("Engraving Type,Number of Systems,Number of Measures\n")
         for item in individual_results:
-            statistics_file.write(item[0] + "," + str(item[1]) + "\n")
+            statistics_file.write(item[0] + "," + str(item[1]) + "," + str(item[2]) + "\n")
 
 
 def compute_number_of_system_on_page(system_measures) -> int:
@@ -103,12 +103,12 @@ def create_engraving_statistics_from_individual_files(dataset_directory, engravi
         system_measures = image_annotations["system_measures"]
         number_of_systems_on_this_page = compute_number_of_system_on_page(system_measures)
         number_of_systems[number_of_systems_on_this_page] += 1
-        individual_results.append((engraving_type, number_of_systems_on_this_page))
+        individual_results.append((engraving_type, number_of_systems_on_this_page, len(system_measures)))
 
     with open("dataset_statistics_muscima_pp.csv", "w") as statistics_file:
-        statistics_file.write("Engraving Type,Number of Systems\n")
+        statistics_file.write("Engraving Type,Number of Systems,Number of Measures\n")
         for item in individual_results:
-            statistics_file.write(item[0] + "," + str(item[1]) + "\n")
+            statistics_file.write(item[0] + "," + str(item[1]) + "," + str(item[2]) + "\n")
 
 
 if __name__ == "__main__":
