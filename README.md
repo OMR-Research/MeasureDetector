@@ -15,12 +15,12 @@ Before running them, make sure that you have the necessary requirements installe
 - pycocotools (more [infos](https://github.com/matterport/Mask_RCNN/issues/6#issuecomment-341503509))
     - On Linux, run `pip install git+https://github.com/waleedka/cocoapi.git#egg=pycocotools&subdirectory=PythonAPI`
     - On Windows, run `pip install git+https://github.com/philferriere/cocoapi.git#egg=pycocotools^&subdirectory=PythonAPI`
-- Some libraries, as specified in [requirements.txt](MusicObjectDetector/requirements.txt)
+- Some libraries, as specified in [requirements.txt](MeasureDetector/requirements.txt)
 
 ## Adding source to Python path
 There are two ways of making sure, that the python script discoveres the correct binaries:
 
-### Permanently linking the source code as pip package
+### Permanently linking the source code as pip package (recommended)
 To permanently link the source-code of the project, for Python to be able to find it, you can link the two packages by running:
 ```bash
 # From MeasureDetector/research/
