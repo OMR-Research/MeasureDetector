@@ -76,13 +76,13 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
         print(sample)
 
 
-def main(annotations_directory: str, annotations_filename: str, output_path: str, label_map_path: str,
+def main(dataset_directory: str, annotations_filename: str, output_path: str, label_map_path: str,
          number_of_shards: int, target_size: int, allow_sample_reuse: bool):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     label_map_dict = label_map_util.get_label_map_dict(label_map_path)
     error_messages = []
 
-    with open(os.path.join(annotations_directory, annotations_filename), 'r') as file:
+    with open(os.path.join(dataset_directory, annotations_filename), 'r') as file:
         dataset = json.load(file)
 
     samples_in_dataset = []
@@ -148,7 +148,7 @@ def attempt_to_find_sample_that_is_not_yet_in_dataset(all_items_in_category, alr
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Creates a tensorflow record from an existing dataset. '
                                                  'Balances ')
-    parser.add_argument('--annotation_directory', type=str, default="data", help='Directory, where all data is stored')
+    parser.add_argument('--dataset_directory', type=str, default="data", help='Directory, where all data is stored')
     parser.add_argument('--annotation_filename', type=str, default="joint_dataset_annotations.json",
                         help='Name of the file containing the annotations')
     parser.add_argument('--output_path', type=str, default="data/output.record",
@@ -163,7 +163,7 @@ if __name__ == '__main__':
 
     random.seed(0)
     flags = parser.parse_args()
-    annotations_directory = flags.annotation_directory
+    dataset_directory = flags.dataset_directory
     annotations_filename = flags.annotation_filename
     output_path = flags.output_path
     label_map_path = flags.label_map_path
@@ -171,5 +171,5 @@ if __name__ == '__main__':
     target_size = flags.target_size
     allow_sample_reuse = flags.allow_sample_reuse
 
-    main(annotations_directory, annotations_filename, output_path, label_map_path, number_of_shards, target_size,
+    main(dataset_directory, annotations_filename, output_path, label_map_path, number_of_shards, target_size,
          allow_sample_reuse)

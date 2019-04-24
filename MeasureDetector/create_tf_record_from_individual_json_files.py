@@ -78,7 +78,6 @@ def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, 
             classes.append(label_map_dict[instance_name])
             classes_text.append(instance_name.encode('utf8'))
 
-
     example = tf.train.Example(features=tf.train.Features(feature={
         'image/height': dataset_util.int64_feature(image_height),
         'image/width': dataset_util.int64_feature(image_width),

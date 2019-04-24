@@ -6,7 +6,7 @@ from omrdatasettools.converters.ImageConverter import ImageConverter
 from omrdatasettools.downloaders.MuscimaPlusPlusDatasetDownloader import MuscimaPlusPlusDatasetDownloader
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Downloads the MUSCIMA++ dataset')
+    parser = argparse.ArgumentParser(description='Downloads and prepares the MUSCIMA++ dataset')
     parser.add_argument("--dataset_directory", type=str, default="data",
                         help="The directory, where the extracted dataset will be copied to")
 

@@ -18,6 +18,7 @@ def convert_annotations_to_one_json_file_per_image(dataset_directory: str):
 
         for name, source in dataset_annotations["sources"].items():
             source_directory = source["root_dir"]
+            engraving = source["type"]
 
             for page in source["pages"]:
                 system_measures = []
@@ -39,7 +40,7 @@ def convert_annotations_to_one_json_file_per_image(dataset_directory: str):
                 json_filename = os.path.splitext(page["image"])[0] + ".json"
                 json_path = os.path.join(dataset_directory, root_directory, source_directory, json_filename)
                 with open(json_path, 'w') as file:
-                    json.dump({'width': width, 'height': height, 'system_measures': system_measures,
+                    json.dump({'width': width, 'height': height, 'engraving': engraving, 'system_measures': system_measures,
                                'stave_measures': stave_measures, 'staves': staves}, file, indent=4)
 
 
