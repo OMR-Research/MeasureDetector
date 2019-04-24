@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from omrdatasettools.converters.EdiromAnnotationConverter import EdiromAnnotationConverter
+from EdiromAnnotationConverter import EdiromAnnotationConverter
 from omrdatasettools.downloaders.EdiromDatasetDownloader import EdiromDatasetDownloader
 
 if __name__ == "__main__":
