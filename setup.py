@@ -8,6 +8,6 @@ setup(
     url='https://github.com/omr-research/measuredetector',
     license='MIT',
     author='Alexander Pacha, Simon Waloschek',
-    author_email='alexander.pacha@tuwien.at, s.waloschek@cemfi.de',
+    author_email='alexander.pacha@tuwien.at',
     description='A deep-learning based detector for measures in musical scores built on top of the Tensorflow Object Detection API'
 )
