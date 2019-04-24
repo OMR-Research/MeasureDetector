@@ -19,12 +19,4 @@ $ docker run -p 8080:8080 measure_detector
 
 ## Testing
 
-```python
-import requests
-
-with open('image.jpg', 'rb') as image:
-    response = requests.post('http://localhost:8080/upload', files={'image': image})
-print(response.content)
-
-```
-
+See `test.py` for a query example.
