@@ -19,4 +19,10 @@ $ docker run -p 8080:8080 measure_detector
 
 ## Testing
 
-See `test.py` for a query example.
+See `test.py` for a query example using Python 3.
+
+In case of missing libraries, execute
+
+```bash
+$ pip install pillow requests
+```
