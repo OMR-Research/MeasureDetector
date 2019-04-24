@@ -18,5 +18,5 @@ numpy >= 1.16.2
 lxml
 pydot
 tqdm
-opencv-python
 omrdatasettools >= 0.15
+contextlib2
