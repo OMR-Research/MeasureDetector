@@ -1,11 +1,5 @@
 $pathToSourceRoot = "C:\Users\Alex\Repositories\MeasureDetector\MeasureDetector\"
-$pathToTranscript = "$($pathToSourceRoot)"
-
 cd $pathToSourceRoot
-echo "Appending source root $($pathToSourceRoot) to temporary PYTHONPATH"
-$env:PYTHONPATH = $pathToSourceRoot
-
-Start-Transcript -path "$($pathToTranscript)Transcript.txt" -append
 
 # Compile Protoc files
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -35,4 +29,5 @@ rm ..\MeasureDetector\protoc-3.4.0-win32.zip
 echo "Verifying correct installation..."
 python object_detection\builders\model_builder_test.py
 
-Stop-Transcript
+Write-Host -NoNewLine 'Press any key to continue...';
+$null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown');
