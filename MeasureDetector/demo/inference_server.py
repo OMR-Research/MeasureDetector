@@ -9,7 +9,7 @@ from PIL import Image
 detection_graph = tf.Graph()
 detection_graph.as_default()
 od_graph_def = tf.GraphDef()
-with tf.gfile.GFile('model.pb', 'rb') as fid:
+with tf.gfile.GFile('2019-04-24_faster-rcnn_inception-resnet-v2.pb', 'rb') as fid:
     serialized_graph = fid.read()
     od_graph_def.ParseFromString(serialized_graph)
     tf.import_graph_def(od_graph_def, name='')
@@ -51,7 +51,7 @@ def detect_measures(body):
 
     image = Image.open(io.BytesIO(body['image'])).convert("RGB")
     (image_width, image_height) = image.size
-    image_np = np.array(image.getdata()).reshape((image_height, image_width, 3)).astype(np.uint8)
+    image_np = np.array(image)
 
     output_dict = infer(image_np)
     measures = []
@@ -66,10 +66,10 @@ def detect_measures(body):
             x2 = x2 * image_width
 
             measures.append({
-                'ulx': x1,
-                'uly': y1,
-                'lrx': x2,
-                'lry': y2
+                'left': x1,
+                'top': y1,
+                'right': x2,
+                'bottom': y2
             })
         else:
             break

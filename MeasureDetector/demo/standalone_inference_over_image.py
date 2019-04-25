@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 
 import numpy as np
@@ -55,32 +56,27 @@ if __name__ == "__main__":
                         help='Path to the frozen inference graph.')
     parser.add_argument('--input_image', type=str, default="IMSLP454437-PMLP738602-Il_tempio_d_amore_Scene2-0002.jpg",
                         help='Path to the input image.')
-    parser.add_argument('--output_image', type=str, default="annotated_image.jpg",
-                        help='Path to the output image, with highlighted boxes.')
-    parser.add_argument('--output_result', type=str, default="output_detections.txt",
-                        help='Path to the output file, that will contain a list of detection, '
-                             'including position-classification')
+    parser.add_argument('--output_result', type=str, default="output_detections.json",
+                        help='Path to the output file, that will contain a list of measures as JSON file')
     args = parser.parse_args()
+    input_image_path = args.input_image
+    basename, ext = os.path.splitext(input_image_path)
+    output_image = basename + '_bboxes' + ext
 
-    # Uncomment the next line on Windows to run the evaluation on the CPU
+    # Uncomment the next line on Windows to run the inference on the CPU, even though a GPU is available
     # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    detection_category_mapping = {1: "system_measure", 2: "stave_measure", 3: "stave"}
-    class_to_index_mapping = {value: key for key, value in detection_category_mapping.items()}
-    colors = ['AliceBlue', 'Green', 'Tomato']
-
-    # Read frozen graphs
     detection_graph = load_detection_graph(args.detection_inference_graph)
 
-    # PIL Image
-    image = Image.open(args.input_image).convert("RGB")  # type: Image.Image
-    image_draw = ImageDraw(image)
-    (image_width, image_height) = image.size
+    image = Image.open(input_image_path).convert("RGB")  # type: Image.Image
     image_np = np.array(image)
+    image = image.convert("RGBA")
+    overlay = Image.new('RGBA', image.size)
+    image_draw = ImageDraw(overlay)
+    (image_width, image_height) = image.size
 
-    # Actual detection
     output_dict = run_inference_for_single_image(image_np, detection_graph)
-    output_lines = []
+    measures = []
 
     for idx in range(output_dict['num_detections']):
         if output_dict['detection_scores'][idx] > 0.5:
@@ -91,21 +87,24 @@ if __name__ == "__main__":
             y2 = y2 * image_height
             x1 = x1 * image_width
             x2 = x2 * image_width
-            detected_class = detection_category_mapping[output_dict['detection_classes'][idx]]
 
-            output_line = "{0:.3f},{1:.3f},{2:.3f},{3:.3f};{4}".format(x1, y1, x2, y2, detected_class)
-            print(output_line)
-            output_lines.append(output_line)
+            measures.append({
+                'left': x1,
+                'top': y1,
+                'right': x2,
+                'bottom': y2
+            })
 
-            if args.output_image is not None:
-                color_name = colors[class_to_index_mapping[detected_class] % len(colors)]
-                image_draw.rectangle([int(x1), int(y1), int(x2), int(y2)], outline=color_name, width=3)
+            if output_image is not None:
+                image_draw.rectangle([int(x1), int(y1), int(x2), int(y2)], fill='#00FFFF1B')
+                image_draw.rectangle([int(x1), int(y1), int(x2), int(y2)], outline='#008888', width=2)
 
         else:
             break
 
-    if args.output_image is not None:
-        image.save(args.output_image)
+    if output_image is not None:
+        result_image = Image.alpha_composite(image, overlay).convert('RGB')
+        result_image.save(output_image)
 
     with open(args.output_result, "w") as output_file:
-        output_file.write("\n".join(output_lines))
+        json.dump(measures, output_file)

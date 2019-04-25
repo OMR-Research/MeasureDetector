@@ -20,3 +20,7 @@ pydot
 tqdm
 omrdatasettools >= 0.15
 contextlib2
+
+# For the inference server
+hug
+requests
