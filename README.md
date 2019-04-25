@@ -8,7 +8,7 @@ This is the repository for the fast and reliable Measure detector with Deep Lear
 This repository contains several scripts that can be used independently of each other. 
 Before running them, make sure that you have the necessary requirements installed.
 
-If you just want to test this project, head over to the [Demo](demo/) folder for more information. 
+If you just want to test this project, head over to the [Demo](MeasureDetector/demo/) folder for more information. 
 
 ## Install required libraries
 
@@ -267,7 +267,7 @@ Once, you have a trained model that you are happy with, you can freeze it for de
 python research/object_detection/export_inference_graph.py --input_type image_tensor --pipeline_config_path "data\faster_rcnn_inception_resnet_v2_atrous_edirom\pipeline.config" --trained_checkpoint_prefix "data\faster_rcnn_inception_resnet_v2_atrous_edirom\model.ckpt-18428" --output_directory output_inference_graph
 ```
 
-To run inference, see the [Demo](demo/) folder for more information. 
+To run inference, see the [Demo](MeasureDetector/demo/) folder for more information. 
 
 
 
