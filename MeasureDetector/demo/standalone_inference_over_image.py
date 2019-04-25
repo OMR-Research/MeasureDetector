@@ -3,11 +3,8 @@ import os
 
 import numpy as np
 import tensorflow as tf
-from PIL import Image, ImageColor
+from PIL import Image
 from PIL.ImageDraw import ImageDraw
-
-STANDARD_COLORS = ['AliceBlue', 'Green', 'Tomato']
-
 
 def run_inference_for_single_image(image, graph):
     with graph.as_default():
@@ -51,17 +48,6 @@ def load_detection_graph(path_to_checkpoint):
     return detection_graph
 
 
-def build_map(path_to_labelmap):
-    int2category = {}
-    lines = open(path_to_labelmap, 'r').read().splitlines()
-
-    for line in lines:
-        integer, category = line.split()
-        int2category[int(integer)] = category
-
-    return int2category
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Performs detection over input image given a trained detector.')
     parser.add_argument('--detection_inference_graph', type=str,
@@ -69,29 +55,25 @@ if __name__ == "__main__":
                         help='Path to the frozen inference graph.')
     parser.add_argument('--input_image', type=str, default="IMSLP454437-PMLP738602-Il_tempio_d_amore_Scene2-0002.jpg",
                         help='Path to the input image.')
-    parser.add_argument('--detection_label_map', type=str, default="category_mapping.txt",
-                        help='Path to the label map, which maps each category name to a unique number.'
-                             'Must be a simple text-file with one mapping per line in the form of:'
-                             '"<number> <label>", e.g. "1 barline".')
     parser.add_argument('--output_image', type=str, default="annotated_image.jpg",
                         help='Path to the output image, with highlighted boxes.')
-    parser.add_argument('--output_result', type=str, default="output_transcript.txt",
+    parser.add_argument('--output_result', type=str, default="output_detections.txt",
                         help='Path to the output file, that will contain a list of detection, '
                              'including position-classification')
     args = parser.parse_args()
 
     # Uncomment the next line on Windows to run the evaluation on the CPU
-    os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-    # Build category map
-    detection_category_mapping = build_map(args.detection_label_map)
+    detection_category_mapping = {1: "system_measure", 2: "stave_measure", 3: "stave"}
     class_to_index_mapping = {value: key for key, value in detection_category_mapping.items()}
+    colors = ['AliceBlue', 'Green', 'Tomato']
 
     # Read frozen graphs
     detection_graph = load_detection_graph(args.detection_inference_graph)
 
     # PIL Image
-    image = Image.open(args.input_image).convert("RGB") # type: Image.Image
+    image = Image.open(args.input_image).convert("RGB")  # type: Image.Image
     image_draw = ImageDraw(image)
     (image_width, image_height) = image.size
     image_np = np.array(image)
@@ -116,7 +98,7 @@ if __name__ == "__main__":
             output_lines.append(output_line)
 
             if args.output_image is not None:
-                color_name = STANDARD_COLORS[class_to_index_mapping[detected_class] % len(STANDARD_COLORS)]
+                color_name = colors[class_to_index_mapping[detected_class] % len(colors)]
                 image_draw.rectangle([int(x1), int(y1), int(x2), int(y2)], outline=color_name, width=3)
 
         else:
