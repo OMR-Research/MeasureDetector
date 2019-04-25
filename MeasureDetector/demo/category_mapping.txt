@@ -1,3 +1,0 @@
-1 system_measure
-2 stave_measure
-3 stave
