@@ -1,6 +1,6 @@
 # Running the server with docker
 
-| ⚠️ WARNING️: The server should not be used for deployment, only testing! |
+| ⚠️ WARNING: The server should not be used for deployment, only testing! |
 | --- |
 
 Put a frozen model in this directory and rename it to `model.pb`.
