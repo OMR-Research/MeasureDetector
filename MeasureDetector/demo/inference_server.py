@@ -1,3 +1,4 @@
+from functools import cmp_to_key
 import io
 
 import hug
@@ -9,11 +10,32 @@ from PIL import Image
 detection_graph = tf.Graph()
 detection_graph.as_default()
 od_graph_def = tf.GraphDef()
-with tf.gfile.GFile('2019-04-24_faster-rcnn_inception-resnet-v2.pb', 'rb') as fid:
+with tf.gfile.GFile('model.pb', 'rb') as fid:
     serialized_graph = fid.read()
     od_graph_def.ParseFromString(serialized_graph)
     tf.import_graph_def(od_graph_def, name='')
 sess = tf.Session()
+
+
+def cmp_measure_bboxes(self, other):
+    """Compares bounding boxes of two measures and returns which one should come first"""
+    if self['left'] >= other['left'] and self['top'] >= other['top']:
+        return +1  # self after other
+    elif self['left'] < other['left'] and self['top'] < other['top']:
+        return -1  # other after self
+    else:
+        overlap_y = min(self['bottom'] - other['top'], other['bottom'] - self['top']) \
+                    / min(self['bottom'] - self['top'], other['bottom'] - other['top'])
+        if overlap_y >= 0.5:
+            if self['left'] < other['left']:
+                return -1
+            else:
+                return 1
+        else:
+            if self['left'] < other['left']:
+                return 1
+            else:
+                return -1
 
 
 def infer(image):
@@ -73,5 +95,7 @@ def detect_measures(body):
             })
         else:
             break
+
+    measures.sort(key=cmp_to_key(cmp_measure_bboxes))
 
     return {'measures': measures}
