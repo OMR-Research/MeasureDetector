@@ -31,7 +31,7 @@ $ docker run -p 8080:8080 measure_detector
 
 ## Talking with the REST API
 
-We offer two example scripts. Mmake sure that you have all the Python requirements:
+We offer two example Python 3 scripts. Make sure that you have all the requirements:
 
 ```bash
 $ pip install -r requirements.txt
