@@ -51,11 +51,12 @@ def load_detection_graph(path_to_checkpoint):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Performs detection over input image given a trained detector.')
+    parser.add_argument('input_image', type=str, default="IMSLP454437-PMLP738602-Il_tempio_d_amore_Scene2-0002.jpg",
+                        help='Path to the input image.')
     parser.add_argument('--detection_inference_graph', type=str,
                         default="2019-04-24_faster-rcnn_inception-resnet-v2.pb",
                         help='Path to the frozen inference graph.')
-    parser.add_argument('--input_image', type=str, default="IMSLP454437-PMLP738602-Il_tempio_d_amore_Scene2-0002.jpg",
-                        help='Path to the input image.')
+
     parser.add_argument('--output_result', type=str, default="output_detections.json",
                         help='Path to the output file, that will contain a list of measures as JSON file')
     args = parser.parse_args()
