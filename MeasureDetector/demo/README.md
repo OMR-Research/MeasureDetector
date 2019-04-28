@@ -17,7 +17,7 @@ The second way to run inference for this project is by firing up an inference se
 Then you can directly start the [server script](inference_server.py) with `hug -p=8080 -f=inference_server.py` (see [run_server.bat](run_server.bat)) or create and run a docker container with the following steps: 
 
 ```bash
-# Build the image
+# Build the image with the latest model
 $ docker build -t measure_detector .
 
 # Run in container (change port to `XXXX:8080` if needed):
