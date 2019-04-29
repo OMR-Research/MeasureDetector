@@ -46,8 +46,7 @@ export PYTHONPATH=$PYTHONPATH:`pwd`/MeasureDetector:`pwd`/research:`pwd`/researc
 For Windows (Powershell):
 ```powershell
 $pathToGitRoot = "[GIT_ROOT]"
-$pathToSourceRoot = "$($pathToGitRoot)/object_detection"
-$env:PYTHONPATH = "$($pathToGitRoot);$($pathToSourceRoot);$($pathToGitRoot)/slim"
+$env:PYTHONPATH = "$($pathToGitRoot)/MeasureDetector;$($pathToGitRoot)/research;$($pathToGitRoot)/research/slim"
 ```
 
 ## Build Protobuf 
@@ -122,8 +121,7 @@ If you want to use your own dataset, all you need to do is to provide two things
       "top": 1205,
       "right": 865,
       "bottom": 1560
-    },
-    ...
+    }
   ],
   "stave_measures": [
     {
@@ -131,8 +129,7 @@ If you want to use your own dataset, all you need to do is to provide two things
       "top": 265,
       "right": 678,
       "bottom": 384
-    },
-    ...
+    }
   ],
   "staves": [
     {
@@ -140,13 +137,12 @@ If you want to use your own dataset, all you need to do is to provide two things
       "top": 265,
       "right": 3347,
       "bottom": 384
-    }, 
-    ...
+    }
   ]
 }
 ```
 
-Note that if you only want to train for system measures, you can just leave the lists for `stave_measures` and `staves` empty. The `engraving` field is also optional, but should be provided, if you want to create a balanced dataset (see below).
+Note, that if you only want to train for system measures, you can just leave the lists for `stave_measures` and `staves` empty. The `engraving` field is also optional, but should be provided, if you want to create a balanced dataset (see below).
 
 ### Converting existing annotations
 If you have existing annotations, but in a different format, you can either parse them directly into a TF-Record on your own (see [Create TF-Record Script](MeasureDetector/create_tf_record_from_individual_json_files.py)) or first convert them into the format, specified above and then use the existing scripts. An example conversion is given in [`prepare_custom_dataset.py`](MeasureDetector/prepare_custom_dataset.py), which converts the following `dataset.json` file into the format of one JSON-file per image.
@@ -155,10 +151,10 @@ If you have existing annotations, but in a different format, you can either pars
 {
   "metadata": {
     "name": "Dataset-X",
-    "date": "2019-03-19",    
+    "date": "2019-03-19" 
   },
   "root_dir": "dataset_root",
-  "concordances": [...]
+  "concordances": [],
   "sources": {
     "source-1": {
       "root_dir": "source-1",
@@ -177,21 +173,18 @@ If you have existing annotations, but in a different format, you can either pars
                   "width": 357,
                   "height": 1051
                 }
-              },
-              ...
+              }
             ]
           }
-        },
-		...
+        }
 	  ]
-	},
-	...
+	}
   }
 }
 ```
 
 ## Joining datasets
-If you have a number of datasets, you might want to join them to train the measure detector on all of them. Put all of them into one directory, e.g., `MeasureDetectionDatasets` and then run 
+If you have a number of datasets, you might want to join them to train the measure detector on all of them. Put all of them into one directory, e.g., `MeasureDetectionDatasets` and then run the following script. You can use sub-directories for individual datasets, e.g., `MeasureDetectionDatasets/Dataset1`, `MeasureDetectionDatasets/Dataset2` as long as the json-files are residing in the same directory as their images. The script will recursively search the given directory and all sub-directories. 
 
 ```bash
 # From MeasureDetector/MeasureDetector
@@ -215,9 +208,7 @@ Keep in mind, that you have to specify the target size, which has to be smaller 
  
 # Running the training
 
-Before starting the training, you need to change the paths, according to your system
-
-- in the configuration, you want to run, e.g. `configurations/faster_rcnn_inception_resnet_v2_atrous_muscima_pretrained_reduced_classes.config`
+Before starting the training, you need to change the paths in the configuration, you want to run, e.g. `configurations/faster_rcnn_inception_resnet_v2_atrous_muscima_pretrained_reduced_classes.config`
 
 
 To start the training: 
@@ -233,7 +224,7 @@ To start the validation:
 python research/object_detection/eval.py --logtostderr --pipeline_config_path="MeasureDetector/configurations/faster_rcnn_inception_v2_all_datasets.config" --checkpoint_dir="data/faster_rcnn_inception_v2_all_datasets" --eval_dir="data/faster_rcnn_inception_v2_all_datasets/eval"
 ```
 
-A few remarks: The two scripts can and should be run at the same time, to get a live evaluation during the training. The values, may be visualized by calling `tensorboard --logdir=checkpoint-directory`.
+A few remarks: The two scripts can and should be run at the same time, to get a live evaluation during the training. The training progress can be visualized by calling `tensorboard --logdir=checkpoint-directory`.
 
 ## Restricting GPU memory usage
 
@@ -276,7 +267,7 @@ To run inference, see the [Demo](MeasureDetector/demo/) folder for more informat
 
 Published under MIT License,
 
-Copyright (c) 2019 [Alexander Pacha](http://alexanderpacha.com), [TU Wien](https://www.ims.tuwien.ac.at/people/alexander-pacha)
+Copyright (c) 2019 [Alexander Pacha](http://alexanderpacha.com), [TU Wien](https://www.ims.tuwien.ac.at/people/alexander-pacha) and [Simon Waloschek, Detmold University of Music](http://www.cemfi.de/people/simon-waloschek).
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
