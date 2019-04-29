@@ -17,7 +17,7 @@ with tf.gfile.GFile('model.pb', 'rb') as fid:
 sess = tf.Session()
 
 
-def cmp_measure_bboxes(self, other):
+def compare_measure_bounding_boxes(self, other):
     """Compares bounding boxes of two measures and returns which one should come first"""
     if self['left'] >= other['left'] and self['top'] >= other['top']:
         return +1  # self after other
@@ -38,7 +38,7 @@ def cmp_measure_bboxes(self, other):
                 return -1
 
 
-def infer(image):
+def infer(image: np.ndarray):
     ops = tf.get_default_graph().get_operations()
     all_tensor_names = {output.name for op in ops for output in op.outputs}
     tensor_dict = {}
@@ -96,6 +96,6 @@ def detect_measures(body):
         else:
             break
 
-    measures.sort(key=cmp_to_key(cmp_measure_bboxes))
+    measures.sort(key=cmp_to_key(compare_measure_bounding_boxes))
 
     return {'measures': measures}

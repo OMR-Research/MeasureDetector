@@ -1,3 +1,6 @@
 /2019-04-24_faster-rcnn_inception-resnet-v2.pb
 /output_transcript.txt
 /output_detections.txt
+*.pb
+*.mei
+**/bboxes

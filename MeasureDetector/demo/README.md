@@ -12,9 +12,9 @@ This will create an annotated image, as well as a json-file with the output dete
 
 
 # Running Inference as a Service
-The second way to run inference for this project is by firing up an inference server that exposes a REST API for easy consumption.
+The second way to run inference is by firing up an inference server that exposes a REST API for easy consumption.
 
-Then you can directly start the [server script](inference_server.py) with `hug -p=8080 -f=inference_server.py` (see [run_server.bat](run_server.bat)) or create and run a docker container with the following steps: 
+To do so, start the [server script](inference_server.py) with `hug -p=8080 -f=inference_server.py` (see also [run_server.bat](run_server.bat)) or create and run a docker container with the following steps: 
 
 ```bash
 # Build the image with the latest model
