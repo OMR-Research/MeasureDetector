@@ -94,6 +94,7 @@ if __name__ == "__main__":
     mei_mdiv = etree.Element('mdiv')
     mei_mdiv.attrib['{http://www.w3.org/XML/1998/namespace}id'] = 'mdiv_' + str(uuid4())
     mei_mdiv.attrib['n'] = str(1)
+    mei_mdiv.attrib['label'] = ''
     mei_body.append(mei_mdiv)
 
     mei_score = etree.Element('score')
@@ -147,6 +148,7 @@ if __name__ == "__main__":
             mei_measure = etree.Element('measure')
             mei_measure.attrib['{http://www.w3.org/XML/1998/namespace}id'] = 'measure_' + str(uuid4())
             mei_measure.attrib['n'] = str(cur_measure)
+            mei_measure.attrib['label'] = str(cur_measure)
             mei_measure.attrib['facs'] = f'#{mei_zone_id}'
             mei_section.append(mei_measure)
             cur_measure += 1
