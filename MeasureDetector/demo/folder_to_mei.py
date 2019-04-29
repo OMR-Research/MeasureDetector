@@ -7,7 +7,8 @@ import os
 from uuid import uuid4
 
 from lxml import etree
-from PIL import Image
+from PIL import Image, ImageFont
+from PIL.ImageDraw import ImageDraw
 import requests
 from tqdm import tqdm
 
@@ -38,12 +39,34 @@ template = f'''<?xml version="1.0" encoding="UTF-8"?>
 </mei>'''.encode()
 
 
+def draw_boxes(image_path, measures):
+    image = Image.open(image_path).convert('RGBA')
+    overlay = Image.new('RGBA', image.size)
+    image_draw = ImageDraw(overlay)
+
+    for measure in measures:
+        image_draw.rectangle([int(measure['left']), int(measure['top']), int(measure['right']), int(measure['bottom'])],
+                             fill='#00FFFF1B')
+    for m, measure in enumerate(measures):
+        image_draw.rectangle([int(measure['left']), int(measure['top']), int(measure['right']), int(measure['bottom'])],
+                             outline='#008888', width=2)
+
+    result_image = Image.alpha_composite(image, overlay).convert('RGB')
+
+    target_dir = os.path.join(os.path.dirname(image_path), 'bboxes')
+    os.makedirs(target_dir, exist_ok=True)
+
+    basename = os.path.basename(image_path)
+    result_path = os.path.join(target_dir, basename)
+    result_image.save(result_path)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Performs measure detection over a folder of images.')
     parser.add_argument('path', type=str, default='.', help='Path to a folder with images.')
     parser.add_argument('--make-images', action='store_true')
     args = parser.parse_args()
-    folder_path = args.folder
+    folder_path = args.path
 
     # Detect measures
     image_paths = []
@@ -91,6 +114,8 @@ if __name__ == "__main__":
         image.close()
 
         measures = page['measures']
+        if args.make_images:
+            draw_boxes(page['path'], measures)
 
         mei_surface = etree.Element('surface')
         mei_surface.attrib['{http://www.w3.org/XML/1998/namespace}id'] = 'surface_' + str(uuid4())

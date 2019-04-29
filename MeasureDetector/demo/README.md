@@ -47,8 +47,10 @@ $ python test_rest_api.py IMSLP454435-PMLP738602-Il_tempio_d_amore_Sinfonia-0011
 
 ### Generating an MEI file from a folder with score images
 [`folder_to_mei.py`](folder_to_mei.py) detects the measures in all images of a given folder and generates an MEI file for further processing.
+`--make-images` is optional and generates images with bounding box overlays in a subfolder.
 
 ```bash
-$ python folder_to_mei.py IMSLP108695
+$ python folder_to_mei.py --make-images IMSLP108695
 ```
+
 
