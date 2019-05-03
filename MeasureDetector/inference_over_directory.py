@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import pickle
 from glob import glob
@@ -47,7 +48,7 @@ if __name__ == "__main__":
     parser.add_argument('--score_threshold', dest='score_threshold', type=float, default=0.5)
     args = parser.parse_args()
 
-    # Uncomment the next line on Windows to run the evaluation on the CPU
+    # Uncomment the next line on Windows to run the evaluation on the CPU, despite a present GPU
     # os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
     # Path to frozen detection graph. This is the actual model that is used for the object detection.
@@ -145,11 +146,21 @@ if __name__ == "__main__":
 
                     input_file_name, extension = os.path.splitext(os.path.basename(input_files_for_batch[index]))
                     output_file = os.path.join(output_directory, "{0}_detection{1}".format(input_file_name, extension))
-                    Image.fromarray(image_np).save(output_file)
+                    pil_image = Image.fromarray(image_np)
+                    width = pil_image.width
+                    height = pil_image.height
+                    pil_image.save(output_file)
 
                     boxes = outputs_dict['detection_boxes'][index]
                     classes = outputs_dict['detection_classes'][index]
                     scores = outputs_dict['detection_scores'][index]
+
+                    # Currently, the dataset only has system measure annotation, so we leave the other two types empty
+                    system_measures = []
+                    stave_measures = []
+                    staves = []
+                    json_filename = input_file_name + ".json"
+                    json_path = os.path.join(output_directory, json_filename)
 
                     for i in range(len(boxes)):
                         top, left, bottom, right = tuple(list(boxes[i]))
@@ -164,23 +175,32 @@ if __name__ == "__main__":
                                 [input_file_name + extension, top, left, bottom, right, class_name, score])
                             per_file_detections_list.append(
                                 [input_file_name + extension, top, left, bottom, right, class_name, score])
+                            if class_name == "system_measure":
+                                system_measures.append({'left': left, 'top': top, 'right': right, 'bottom': bottom})
+                            elif class_name == "stave_measure":
+                                stave_measures.append({'left': left, 'top': top, 'right': right, 'bottom': bottom})
+                            elif class_name == "stave":
+                                staves.append({'left': left, 'top': top, 'right': right, 'bottom': bottom})
 
                     detections = pd.DataFrame(data=per_file_detections_list,
                                               columns=["image_name", "top", "left", "bottom", "right", "class_name",
                                                        "confidence"])
                     output_csv_file = os.path.join(output_directory, "{0}_detection.csv".format(input_file_name))
                     detections.to_csv(output_csv_file, index=False, float_format="%.2f")
+                    with open(json_path, 'w') as file:
+                        json.dump({'width': width, 'height': height, 'system_measures': system_measures,
+                                   'stave_measures': stave_measures, 'staves': staves}, file, indent=4)
 
                 images_for_batch = []
                 image_dimensions_for_batch = []
                 input_files_for_batch = []
 
-            detections = pd.DataFrame(data=detections_list,
-                                      columns=["image_name", "top", "left", "bottom", "right", "class_name",
-                                               "confidence"])
-            detections.to_csv(os.path.join(output_directory, "detections.csv"), index=False, float_format="%.2f")
+    detections = pd.DataFrame(data=detections_list,
+                              columns=["image_name", "top", "left", "bottom", "right", "class_name",
+                                       "confidence"])
+    detections.to_csv(os.path.join(output_directory, "detections.csv"), index=False, float_format="%.2f")
 
-            end_time = time()
+    end_time = time()
 
-            print("Total execution time: {0:.0f}s".format(end_time - start_time))
-            print("Execution time without initialization: {0:.0f}s".format(end_time - detection_start_time))
+    print("Total execution time: {0:.0f} seconds".format(end_time - start_time))
+    print("Execution time without initialization: {0:.0f} seconds".format(end_time - detection_start_time))
