@@ -76,7 +76,11 @@ if __name__ == "__main__":
     detection_start_time = time()
 
     with detection_graph.as_default():
-        with tf.Session() as sess:
+        # Uncomment the following line to restrict GPU memory
+        # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
+        gpu_options = tf.GPUOptions()
+        with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
+
             # Get handles to input and output tensors
             ops = tf.get_default_graph().get_operations()
             all_tensor_names = {output.name for op in ops for output in op.outputs}
@@ -142,7 +146,8 @@ if __name__ == "__main__":
                         use_normalized_coordinates=True,
                         line_thickness=4,
                         skip_scores=not show_scores,
-                        skip_labels=not show_labels)
+                        skip_labels=not show_labels,
+                        min_score_thresh=score_threshold)
 
                     input_file_name, extension = os.path.splitext(os.path.basename(input_files_for_batch[index]))
                     output_file = os.path.join(output_directory, "{0}_detection{1}".format(input_file_name, extension))
