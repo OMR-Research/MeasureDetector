@@ -9,3 +9,6 @@ Transcripts
 /detection_output/
 data
 URLs.txt
+/deep_scores_detection_output/
+/general_detection_output/
+/muscima-pp-output/
