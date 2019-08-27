@@ -10,6 +10,8 @@ Before running them, make sure that you have the necessary requirements installe
 
 If you just want to test this project, head over to the [Demo](MeasureDetector/demo/) folder for more information. 
 
+You may also want to check out the self-contained [Deep Optical Measure Detector](https://github.com/cemfi/measure-detector), which wraps this project into a standalone Docker container and provides a beautiful web-application that takes images and creates annotated images, as well as [MEI](https://music-encoding.org/) files.
+
 ## Install required libraries
 
 - Python 3.6 or 3.7
@@ -97,7 +99,12 @@ Afterwards you have to convert the dataset to into the TF-Record format for Tens
     
 ```bash
 # From MeasureDetector/MeasureDetector/
-python create_tf_record_from_individual_json_files.py --image_directory data/muscima_pp/v1.0/data/images --annotation_directory data/muscima_pp/v1.0/data/json --output_path_training_split=data/muscima_pp/muscima_pp_training.record --output_path_validation_split=data/muscima_pp/muscima_pp_validation.record --output_path_test_split=data/muscima_pp/muscima_pp_test.record --num_shards 1 
+python create_tf_record_from_individual_json_files.py \
+  --image_directory data/muscima_pp/v1.0/data/images \
+  --annotation_directory data/muscima_pp/v1.0/data/json \
+  --output_path_training_split=data/muscima_pp/training.record \
+  --output_path_validation_split=data/muscima_pp/validation.record \
+  --output_path_test_split=data/muscima_pp/test.record --num_shards 1 
 ```
 
 If you just want to train on MUSCIMA++, proceed to [training section.](#train-the-detector)
@@ -197,9 +204,24 @@ Finally you can take any of these json-files to create the TF-Record file that w
  
 ```bash
 # From MeasureDetector/MeasureDetector
-python create_tf_record_from_joint_dataset.py --dataset_directory MeasureDetectionDatasets --annotation_filename training_joint_dataset.json --output_path MeasureDetectionDatasets\training.record --target_size=4000 --allow_sample_reuse
-python create_tf_record_from_joint_dataset.py --dataset_directory MeasureDetectionDatasets --annotation_filename validation_joint_dataset.json --output_path MeasureDetectionDatasets\validation.record --target_size=800
-python create_tf_record_from_joint_dataset.py --dataset_directory MeasureDetectionDatasets --annotation_filename test_joint_dataset.json --output_path MeasureDetectionDatasets\test.record --target_size=800
+python create_tf_record_from_joint_dataset.py \
+  --dataset_directory MeasureDetectionDatasets \
+  --annotation_filename training_joint_dataset.json \
+  --output_path MeasureDetectionDatasets\training.record \
+  --target_size=4000 \
+  --allow_sample_reuse
+  
+python create_tf_record_from_joint_dataset.py \
+  --dataset_directory MeasureDetectionDatasets \
+  --annotation_filename validation_joint_dataset.json \
+  --output_path MeasureDetectionDatasets\validation.record \
+  --target_size=800
+
+python create_tf_record_from_joint_dataset.py \
+  --dataset_directory MeasureDetectionDatasets \
+  --annotation_filename test_joint_dataset.json \
+  --output_path MeasureDetectionDatasets\test.record \
+  --target_size=800
 ```
  
 Those scripts will automatically sub-sample the dataset to be equally drawn from the categories `[Handwritten, Typeset]` x `[No staves, One stave, Two staves, Three staves, More staves]` until the target size is reached. That means, individual samples can be represented multiple times in the record.
@@ -214,14 +236,19 @@ Before starting the training, you need to change the paths in the configuration,
 To start the training: 
 ```bash
 # From MeasureDetector/
-python research/object_detection/legacy/train.py --pipeline_config_path="MeasureDetector/configurations/faster_rcnn_inception_v2_all_datasets.config" --train_dir="data/faster_rcnn_inception_v2_all_datasets"
+python research/object_detection/legacy/train.py \
+  --pipeline_config_path="MeasureDetector/configurations/faster_rcnn_inception_v2_all_datasets.config" \
+  --train_dir="data/faster_rcnn_inception_v2_all_datasets"
 ```
 
 To start the validation: 
 
 ```bash
 # From MeasureDetector/
-python research/object_detection/eval.py --logtostderr --pipeline_config_path="MeasureDetector/configurations/faster_rcnn_inception_v2_all_datasets.config" --checkpoint_dir="data/faster_rcnn_inception_v2_all_datasets" --eval_dir="data/faster_rcnn_inception_v2_all_datasets/eval"
+python research/object_detection/eval.py \
+  --pipeline_config_path="MeasureDetector/configurations/faster_rcnn_inception_v2_all_datasets.config" \
+  --checkpoint_dir="data/faster_rcnn_inception_v2_all_datasets" \
+  --eval_dir="data/faster_rcnn_inception_v2_all_datasets/eval"
 ```
 
 A few remarks: The two scripts can and should be run at the same time, to get a live evaluation during the training. The training progress can be visualized by calling `tensorboard --logdir=checkpoint-directory`.
@@ -237,7 +264,7 @@ sess = tf.Session(config=tf.ConfigProto(gpu_options=gpu_options))
 
 ## Training with pre-trained weights
 
-It is recommended that you use pre-trained weights for known networks to speed up training and improve overall results. To do so, head over to the [Tensorflow detection model zoo](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md), download and unzip the respective trained model, e.g. `faster_rcnn_inception_resnet_v2_atrous_coco` for reproducing the best results, we obtained. The path to the unzipped files, must be specified inside of the configuration in the `train_config`-section, e.g.
+It is recommended that you use pre-trained weights for known networks to speed up training and improve overall results. To do so, head over to the [Tensorflow detection model zoo](https://github.com/tensorflow/models/blob/master/research/object_detection/g3doc/detection_model_zoo.md), download and unzip the respective trained model, e.g. `faster_rcnn_inception_resnet_v2_atrous_coco` for reproducing the best results, we obtained. The path to the unzipped files, must be specified inside of the configuration in the `train_config`-section, e.g.,
 
 ```
 train-config: {
@@ -254,13 +281,21 @@ train-config: {
 Once, you have a trained model that you are happy with, you can freeze it for deployment and usage for inference.
 
 ```bash
-# From MeasureDetector
-python research/object_detection/export_inference_graph.py --input_type image_tensor --pipeline_config_path "data\faster_rcnn_inception_resnet_v2_atrous_edirom\pipeline.config" --trained_checkpoint_prefix "data\faster_rcnn_inception_resnet_v2_atrous_edirom\model.ckpt-18428" --output_directory output_inference_graph
+# From MeasureDetector/
+python research/object_detection/export_inference_graph.py \
+   --input_type image_tensor \
+   --pipeline_config_path "MeasureDetector/data/faster_rcnn_inception_resnet_v2_atrous_muscima_pp_fine_grid/pipeline.config" \ 
+   --trained_checkpoint_prefix "MeasureDetector/data/faster_rcnn_inception_resnet_v2_atrous_muscima_pp_fine_grid/model.ckpt-3814" \ 
+   --output_directory "MeasureDetector/data/faster_rcnn_inception_resnet_v2_atrous_muscima_pp_fine_grid/output_inference_graph"
 ```
 
 To run inference, see the [Demo](MeasureDetector/demo/) folder for more information. 
 
+You can also export the [Tensorflow-model into the ONNX format](https://github.com/onnx/tensorflow-onnx) by running the following command:
 
+```bash
+TBD
+```
 
 
 # License
