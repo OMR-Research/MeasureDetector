@@ -5,22 +5,20 @@ import json
 import os
 import random
 from glob import glob
+from typing import List, Dict, Generator
 
 import PIL.Image
 import contextlib2
 import tensorflow as tf
-from typing import List, Dict, Generator
-
+from MeasureDetector.errors import InvalidImageFormatError, InvalidImageError
 from PIL.Image import Image
-
-from MeasureDetector.errors import InvalidImageFormatError, InvalidImageError, InvalidAnnotationError
 from object_detection.dataset_tools import tf_record_creation_util
-from object_detection.utils import dataset_util
-from object_detection.utils import label_map_util
+from object_detection.utils import dataset_util, label_map_util
 from tqdm import tqdm
 
 
-def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, label_map_dict: Dict[str, int]):
+def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, label_map_dict: Dict[str, int],
+                                         included_classes: List[str]):
     with tf.gfile.GFile(path_to_image, 'rb') as fid:
         encoded_image = fid.read()
     encoded_image_io = io.BytesIO(encoded_image)
@@ -52,10 +50,11 @@ def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, 
     difficult_obj = []
 
     object_classes = [("system_measures", "system_measure"),
-                      # ("stave_measures", "stave_measure"),
-                      # ("staves", "stave")
-                      ]
+                      ("stave_measures", "stave_measure"),
+                      ("staves", "stave")]
     for class_name, instance_name in object_classes:
+        if class_name not in included_classes:
+            continue
         for bounding_box in annotations[class_name]:
             left, top, right, bottom = bounding_box["left"], bounding_box["top"], bounding_box["right"], \
                                        bounding_box["bottom"]
@@ -103,7 +102,8 @@ def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, 
 
 def annotations_to_tf_example_list(all_image_paths: List[str],
                                    all_annotation_paths: List[str],
-                                   label_map_dict: Dict[str, int]) -> Generator[tf.train.Example, None, None]:
+                                   label_map_dict: Dict[str, int],
+                                   included_classes: List[str]) -> Generator[tf.train.Example, None, None]:
     """Convert json files and images to tf.Example proto.
 
     Notice that this function normalizes the bounding box coordinates provided
@@ -126,7 +126,7 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
             with open(path_to_annotations, 'r') as gt_file:
                 annotations = json.load(gt_file)
 
-            example = encode_sample_into_tensorflow_sample(path_to_image, annotations, label_map_dict)
+            example = encode_sample_into_tensorflow_sample(path_to_image, annotations, label_map_dict, included_classes)
             yield example
 
         except Exception as ex:
@@ -141,7 +141,7 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
 def get_training_validation_test_indices(all_image_paths):
     seed = 0
     validation_fraction = 0.1
-    test_fraction = 0.1
+    test_fraction = 0.0
     random.seed(seed)
     dataset_size = len(all_image_paths)
     all_indices = list(range(0, dataset_size))
@@ -155,7 +155,8 @@ def get_training_validation_test_indices(all_image_paths):
 
 
 def main(image_directory: str, annotation_directory: str, output_path_training_split: str,
-         output_path_validation_split: str, output_path_test_split: str, label_map_path: str, number_of_shards: int):
+         output_path_validation_split: str, output_path_test_split: str, label_map_path: str, number_of_shards: int,
+         included_classes: List[str]):
     os.makedirs(os.path.dirname(output_path_training_split), exist_ok=True)
     label_map_dict = label_map_util.get_label_map_dict(label_map_path)
     all_jpg_image_paths = glob(f"{image_directory}/**/*.jpg", recursive=True)
@@ -192,7 +193,7 @@ def main(image_directory: str, annotation_directory: str, output_path_training_s
         test_tf_records = tf_record_creation_util.open_sharded_output_tfrecords(
             tf_record_close_stack, output_path_test_split, number_of_shards)
         index = 0
-        for tf_example in annotations_to_tf_example_list(all_image_paths, all_annotation_paths, label_map_dict):
+        for tf_example in annotations_to_tf_example_list(all_image_paths, all_annotation_paths, label_map_dict, included_classes):
             shard_index = index % number_of_shards
             index += 1
 
@@ -222,6 +223,8 @@ if __name__ == '__main__':
                         help='Path to output TFRecord')
     parser.add_argument('--label_map_path', type=str, default='mapping.txt',
                         help='Path to label map proto.txt')
+    parser.add_argument('--included_classes', type=str, default='system_measures',
+                        help='The included classes that should be handled. A comma-separated list of [system_measures, stave_measures, staves], e.g., "system_measures,staves"')
     parser.add_argument('--num_shards', type=int, default=4, help='Number of TFRecord shards')
 
     flags = parser.parse_args()
@@ -232,7 +235,8 @@ if __name__ == '__main__':
     output_path_test_split = flags.output_path_test_split
     label_map_path = flags.label_map_path
     number_of_shards = flags.num_shards
+    included_classes_string = flags.included_classes
+    included_classes = included_classes_string.split(",")
 
     main(image_directory, annotations_directory, output_path_training_split, output_path_validation_split,
-         output_path_test_split,
-         label_map_path, number_of_shards)
+         output_path_test_split, label_map_path, number_of_shards, included_classes)

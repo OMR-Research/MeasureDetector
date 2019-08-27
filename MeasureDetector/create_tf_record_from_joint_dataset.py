@@ -64,7 +64,7 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
                 os.path.splitext(os.path.basename(path_to_annotations))[0])
 
         try:
-            example = encode_sample_into_tensorflow_sample(path_to_image, path_to_annotations, label_map_dict)
+            example = encode_sample_into_tensorflow_sample(path_to_image, path_to_annotations, label_map_dict, ["stave_measures"])
             yield example
 
         except Exception as ex:
@@ -111,7 +111,7 @@ def main(dataset_directory: str, annotations_filename: str, output_path: str, la
                         # If random sample is None, no more samples is available, and reuse is prohibited. Skip it
                         if random_sample is not None:
                             tf_example = encode_sample_into_tensorflow_sample(random_sample["path"], random_sample,
-                                                                              label_map_dict)
+                                                                              label_map_dict, ["stave_measures"])
                             samples_in_dataset.append(random_sample['path'])
                         encoding_succeeded = True
                     except Exception as ex:
