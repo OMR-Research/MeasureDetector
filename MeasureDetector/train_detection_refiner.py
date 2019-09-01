@@ -1,20 +1,29 @@
+import json
+import math
 import os
+import sys
+from glob import glob
+from typing import Tuple, Dict, Any
 
+import torch
 import torch.nn.functional as F
+import utils
 from PIL import Image
-from torch.nn import Module, Conv2d, MaxPool2d, Linear, AdaptiveAvgPool2d, ReLU6
+from PIL.ImageDraw import ImageDraw
+from torch.nn import Module, Conv2d, MaxPool2d, Linear, AdaptiveAvgPool2d, ReLU6, MSELoss, L1Loss
+from torch.utils.data import Dataset
+from torch.utils.data.dataloader import DataLoader
 from torchsummary import summary
+import numpy as np
+from torchvision.transforms import ToTensor
 
 
-class MuscimaPpDataset(Dataset):
-    """ The Muscima++ V2.0 Segmentation Dataset
-
-    The [torchvision reference scripts for training object detection, instance segmentation and person keypoint detection](https://github.com/pytorch/vision/tree/v0.3.0/references/detection) allows for easily supporting adding new custom datasets.
-    The dataset should inherit from the standard `torch.utils.data.Dataset` class, and implement `__len__` and `__getitem__`.
+class BoundingBoxRefinementDataset(Dataset):
+    """ A dataset, dedicated to bounding box refinement
 
     The only specificity that we require is that the dataset `__getitem__` should return:
 
-    * image: a PIL Image of size (H, W)
+    * image: a PIL Image of size (H, W) that contains just one stave
     * target: a dict containing the following fields
         * `boxes` (`FloatTensor[N, 4]`): the coordinates of the `N` bounding boxes in `[x0, y0, x1, y1]` format, ranging from `0` to `W` and `0` to `H`
         * `labels` (`Int64Tensor[N]`): the label for each bounding box
@@ -30,99 +39,64 @@ class MuscimaPpDataset(Dataset):
 
     """
 
-    def __init__(self, image_directory: str, masks_directory: str, transforms=None, cache_images_in_memory=False, shrink_factor=1):
-        self.masks_directory = masks_directory
-        self.image_directory = image_directory
+    def __init__(self, data_directory: str, margin_around_stave=100, transforms=None):
+        self.data_directory = data_directory
+        self.margin_around_stave = margin_around_stave
         self.transforms = transforms
-        self.shrink_factor = shrink_factor
-        # load all image files, sorting them to
-        # ensure that they are aligned
-        self.imgs = list(sorted(os.listdir(image_directory)))
-        self.masks = list(sorted(os.listdir(masks_directory)))
-        self.cache_images_in_memory = cache_images_in_memory
-        if cache_images_in_memory:
-            self.image_cache = []
-            for i in range(len(self.imgs)):
-                self.image_cache.append(self.load_image(i))
-            self.target_cache = []
-            for i in range(len(self.masks)):
-                self.target_cache.append(self.load_target(i))
+        # load all image files, sorting them to ensure that they are aligned
+        images = sorted(glob(data_directory + "/*.png") + glob(data_directory + "/*.jpg"))
+        annotation_files = sorted(glob(data_directory + "/*.json"))
 
+        self.dataset = []
 
-    def __getitem__(self, idx: int) -> Tuple[Image.Image, Dict[str, Any]]:
-        if self.cache_images_in_memory:
-            img = self.image_cache[idx]
-        else:
-            img = self.load_image(idx)
+        for annotation_file, image_file in zip(annotation_files, images):
+            annotations = self.load_annotations(annotation_file)
+            for stave in annotations["staves"]:
+                self.dataset.append((image_file, stave))
 
-        if self.cache_images_in_memory:
-            target = self.target_cache[idx]
-        else:
-            target = self.load_target(idx)
+    def __getitem__(self, index: int) -> Tuple[Image.Image, Dict[str, float]]:
+        image_path, bounding_box = self.dataset[index]
+        image = self.load_image(image_path, bounding_box)
+
+        crop_top = max(0, bounding_box["top"] - self.margin_around_stave)
+        crop_bottom = min(image.height, bounding_box["bottom"] + self.margin_around_stave)
+
+        cropped_image = image.crop([0, crop_top, image.width, crop_bottom])  # Crop only top and bottom
+        bounding_box["top"] = bounding_box["top"] - crop_top
+        bounding_box["bottom"] = bounding_box["bottom"] - crop_top
+
+        # image_draw = ImageDraw(cropped_image)
+        # image_draw.rectangle([int(bounding_box['left']), int(bounding_box['top']), int(bounding_box['right']),
+        #                       int(bounding_box['bottom'])],
+        #                      outline='#008888', width=2)
+
+        cropped_image = ToTensor()(cropped_image)
+
+        left, top, right, bottom = bounding_box["left"], bounding_box["top"], bounding_box["right"], bounding_box[
+            "bottom"]
+        width = right - left
+        height = bottom - top
+        center_x = left + width / 2
+        center_y = top + height / 2
+
+        boxes = torch.as_tensor([center_x, center_y, width, height], dtype=torch.float32)
 
         if self.transforms is not None:
-            img, target = self.transforms(img, target)
+            cropped_image, boxes = self.transforms(cropped_image, boxes)
 
-        return img, target
+        return cropped_image, boxes
 
-    def load_target(self, idx):
-        # note that we haven't converted the mask to RGB,
-        # because each color corresponds to a different instance
-        # with 0 being background
-        mask_path = os.path.join(self.masks_directory, self.masks[idx])
-        mask = Image.open(mask_path)  # type:Image.Image
-        mask = mask.resize((mask.width // self.shrink_factor, mask.height // self.shrink_factor))
-
-        mask = np.array(mask)
-        # instances are encoded as different colors
-        obj_ids = np.unique(mask)
-        # first id is the background, so remove it
-        obj_ids = obj_ids[1:]
-
-        # split the color-encoded mask into a set
-        # of binary masks
-        masks = mask == obj_ids[:, None, None]
-
-        # get bounding box coordinates for each mask
-        num_objs = len(obj_ids)
-        boxes = []
-        for i in range(num_objs):
-            pos = np.where(masks[i])
-            xmin = np.min(pos[1])
-            xmax = np.max(pos[1])
-            ymin = np.min(pos[0])
-            ymax = np.max(pos[0])
-            boxes.append([xmin, ymin, xmax, ymax])
-
-        boxes = torch.as_tensor(boxes, dtype=torch.float32)
-        # there is only one class
-        labels = torch.ones((num_objs,), dtype=torch.int64)
-        masks = torch.as_tensor(masks, dtype=torch.uint8)
-
-        image_id = torch.tensor([idx])
-        area = (boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])
-        # suppose all instances are not crowd
-        iscrowd = torch.zeros((num_objs,), dtype=torch.int64)
-
-        target = {}
-        target["boxes"] = boxes
-        target["labels"] = labels
-        target["masks"] = masks
-        target["image_id"] = image_id
-        target["area"] = area
-        target["iscrowd"] = iscrowd
-
-        return target
-
-    def load_image(self, idx):
-        img_path = os.path.join(self.image_directory, self.imgs[idx])
-        img = Image.open(img_path).convert("RGB")
-        img = img.resize((img.width // self.shrink_factor, img.height // self.shrink_factor))
-        return img
+    def load_image(self, image_path, bounding_box) -> Image.Image:
+        image = Image.open(image_path).convert("RGB")
+        return image
 
     def __len__(self) -> int:
-        return len(self.imgs)
+        return len(self.dataset)
 
+    def load_annotations(self, annotation_file):
+        with open(annotation_file, 'r') as gt_file:
+            annotations = json.load(gt_file)
+        return annotations
 
 
 class DetectionRefinementModel(Module):
@@ -140,12 +114,6 @@ class DetectionRefinementModel(Module):
         self.relu = ReLU6(inplace=True)
 
     def forward(self, image, unrefined_bounding_box):
-        # left, top, right, bottom = unrefined_bounding_box
-        # width = right - left
-        # height = bottom - top
-        # center_x = left + width / 2
-        # center_y = top + height / 2
-
         x = self.pool(self.relu(self.conv1(image)))
         x = self.pool(self.relu(self.conv2(x)))
         x = self.pool(self.relu(self.conv3(x)))
@@ -155,12 +123,73 @@ class DetectionRefinementModel(Module):
         x = x.view(x.size(0), -1)
         x = self.relu(self.linear1(x))
         x = self.relu(self.linear2(x))
-        x = x + unrefined_bounding_box
+        # x = x + unrefined_bounding_box
 
         return x
 
 
+def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
+    model.train()
+    criterion = L1Loss()
+    metric_logger = utils.MetricLogger(delimiter="  ")
+    metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
+    header = 'Epoch: [{}]'.format(epoch)
+
+    lr_scheduler = None
+    # if epoch == 0:
+    #     warmup_factor = 1. / 1000
+    #     warmup_iters = min(1000, len(data_loader) - 1)
+    #
+    #     lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
+
+    for images, targets in metric_logger.log_every(data_loader, print_freq, header):
+        images = images.to(device)
+        targets = targets.to(device)
+
+        prediction = model(images, None)
+        loss = criterion(prediction, targets)
+
+        if not math.isfinite(loss):
+            print("Loss is {}, stopping training".format(loss))
+            sys.exit(1)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        if lr_scheduler is not None:
+            lr_scheduler.step()
+
+        metric_logger.update(loss=loss)
+        metric_logger.update(lr=optimizer.param_groups[0]["lr"])
+
+
 if __name__ == '__main__':
-    network = DetectionRefinementModel()
-    print(network)
-    summary(network, [(3, 128, 256), (4,)], device="cpu")
+    device = "cpu"  # torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    model = DetectionRefinementModel()
+    print(model)
+    # If you get an error, go to torchsummary.py and fix line 100 into
+    # total_input_size = abs(np.prod(sum(input_size,())) * batch_size * 4. / (1024 ** 2.))
+    # see https://github.com/sksq96/pytorch-summary/issues/90
+    summary(model, [(3, 128, 256), (4,)], device=device)
+    model.to(device)
+
+    dataset = BoundingBoxRefinementDataset("D:\Dropbox\Stave Detection\CVCMUSCIMA_2000")
+    first_image, bounding_box = dataset[0]
+    # first_image.show()
+    training_dataset_loader = DataLoader(dataset, batch_size=1, shuffle=True)
+
+    params = [p for p in model.parameters() if p.requires_grad]
+    optimizer = torch.optim.Adam(params, lr=0.001, weight_decay=0.0005)
+    lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.5)
+
+    num_epochs = 10
+
+    for epoch in range(num_epochs):
+        # train for one epoch, printing every 10 iterations
+        train_one_epoch(model, optimizer, training_dataset_loader, device, epoch, print_freq=1)
+        # update the learning rate
+        lr_scheduler.step()
+        # evaluate on the test dataset
+        # evaluate(model, data_loader_test, device=device)
+        torch.save(model.state_dict(), "model-{0}.pth".format(epoch))
