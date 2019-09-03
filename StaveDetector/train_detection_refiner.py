@@ -4,19 +4,16 @@ import os
 import random
 import sys
 from glob import glob
-from typing import Tuple, Dict, Any
+from typing import Tuple, Dict
 
 import torch
-import torch.nn.functional as F
-import utils
 from PIL import Image
-from PIL.ImageDraw import ImageDraw
-from torch.nn import Module, Conv2d, MaxPool2d, Linear, AdaptiveAvgPool2d, ReLU6, MSELoss, L1Loss
+from torch.nn import Module, Conv2d, MaxPool2d, Linear, AdaptiveAvgPool2d, ReLU6, MSELoss
 from torch.utils.data import Dataset
 from torch.utils.data.dataloader import DataLoader
 from torchsummary import summary
-import numpy as np
 from torchvision.transforms import ToTensor
+import utils
 
 
 class BoundingBoxRefinementDataset(Dataset):
@@ -40,7 +37,8 @@ class BoundingBoxRefinementDataset(Dataset):
 
     """
 
-    def __init__(self, data_directory: str, random_margin_around_stave=160, transforms=None):
+    def __init__(self, data_directory: str, random_margin_around_stave=120, minimum_margin=40, transforms=None):
+        self.minimum_margin = minimum_margin
         self.data_directory = data_directory
         self.max_random_margin_around_stave = random_margin_around_stave
         self.transforms = transforms
@@ -56,16 +54,22 @@ class BoundingBoxRefinementDataset(Dataset):
 
     def __getitem__(self, index: int) -> Tuple[Image.Image, Dict[str, float]]:
         image_path, bounding_box = self.dataset[index]
-        image = self.load_image(image_path, bounding_box)
+        image = self.load_image(image_path)
 
-        top_margin = random.randrange(0, self.max_random_margin_around_stave)
-        bottom_margin = random.randrange(0, self.max_random_margin_around_stave)
+        top_margin = random.randrange(0, self.max_random_margin_around_stave) + self.minimum_margin
+        bottom_margin = random.randrange(0, self.max_random_margin_around_stave) + self.minimum_margin
+        left_margin = random.randrange(0, self.max_random_margin_around_stave) + self.minimum_margin
+        right_margin = random.randrange(0, self.max_random_margin_around_stave) + self.minimum_margin
         crop_top = max(0, bounding_box["top"] - top_margin)
         crop_bottom = min(image.height, bounding_box["bottom"] + bottom_margin)
+        crop_left = max(0, bounding_box["left"] - left_margin)
+        crop_right = min(image.width, bounding_box["right"] + right_margin)
 
-        cropped_image = image.crop([0, crop_top, image.width, crop_bottom])  # Crop only top and bottom
+        cropped_image = image.crop([crop_left, crop_top, crop_right, crop_bottom])
         bounding_box["top"] = bounding_box["top"] - crop_top
         bounding_box["bottom"] = bounding_box["bottom"] - crop_top
+        bounding_box["left"] = bounding_box["left"] - crop_left
+        bounding_box["right"] = bounding_box["right"] - crop_left
 
         # image_draw = ImageDraw(cropped_image)
         # image_draw.rectangle([int(bounding_box['left']), int(bounding_box['top']), int(bounding_box['right']),
@@ -91,7 +95,7 @@ class BoundingBoxRefinementDataset(Dataset):
 
         return cropped_image, boxes
 
-    def load_image(self, image_path, bounding_box) -> Image.Image:
+    def load_image(self, image_path) -> Image.Image:
         image = Image.open(image_path).convert("RGB")
         return image
 
@@ -190,7 +194,7 @@ if __name__ == '__main__':
 
     num_epochs = 10
 
-    os.makedirs("checkpoints",exist_ok=True)
+    os.makedirs("checkpoints", exist_ok=True)
     try:
         for epoch in range(num_epochs):
             # train for one epoch, printing every 10 iterations
@@ -199,6 +203,7 @@ if __name__ == '__main__':
             lr_scheduler.step()
             # evaluate on the test dataset
             # evaluate(model, data_loader_test, device=device)
+            print("Saving model at checkpoints/model-{0}.pth".format(epoch))
             torch.save(model.state_dict(), "checkpoints/model-{0}.pth".format(epoch))
     except KeyboardInterrupt:
         print("Saving interrupted model")
