@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import random
 import sys
 from glob import glob
 from typing import Tuple, Dict, Any
@@ -39,14 +40,13 @@ class BoundingBoxRefinementDataset(Dataset):
 
     """
 
-    def __init__(self, data_directory: str, margin_around_stave=100, transforms=None):
+    def __init__(self, data_directory: str, random_margin_around_stave=160, transforms=None):
         self.data_directory = data_directory
-        self.margin_around_stave = margin_around_stave
+        self.max_random_margin_around_stave = random_margin_around_stave
         self.transforms = transforms
         # load all image files, sorting them to ensure that they are aligned
         images = sorted(glob(data_directory + "/*.png") + glob(data_directory + "/*.jpg"))
         annotation_files = sorted(glob(data_directory + "/*.json"))
-
         self.dataset = []
 
         for annotation_file, image_file in zip(annotation_files, images):
@@ -58,8 +58,10 @@ class BoundingBoxRefinementDataset(Dataset):
         image_path, bounding_box = self.dataset[index]
         image = self.load_image(image_path, bounding_box)
 
-        crop_top = max(0, bounding_box["top"] - self.margin_around_stave)
-        crop_bottom = min(image.height, bounding_box["bottom"] + self.margin_around_stave)
+        top_margin = random.randrange(0, self.max_random_margin_around_stave)
+        bottom_margin = random.randrange(0, self.max_random_margin_around_stave)
+        crop_top = max(0, bounding_box["top"] - top_margin)
+        crop_bottom = min(image.height, bounding_box["bottom"] + bottom_margin)
 
         cropped_image = image.crop([0, crop_top, image.width, crop_bottom])  # Crop only top and bottom
         bounding_box["top"] = bounding_box["top"] - crop_top
@@ -69,7 +71,9 @@ class BoundingBoxRefinementDataset(Dataset):
         # image_draw.rectangle([int(bounding_box['left']), int(bounding_box['top']), int(bounding_box['right']),
         #                       int(bounding_box['bottom'])],
         #                      outline='#008888', width=2)
+        # cropped_image.show()
 
+        image_width, image_height = cropped_image.size
         cropped_image = ToTensor()(cropped_image)
 
         left, top, right, bottom = bounding_box["left"], bounding_box["top"], bounding_box["right"], bounding_box[
@@ -79,7 +83,8 @@ class BoundingBoxRefinementDataset(Dataset):
         center_x = left + width / 2
         center_y = top + height / 2
 
-        boxes = torch.as_tensor([center_x, center_y, width, height], dtype=torch.float32)
+        relative_box = [center_x / image_width, center_y / image_height, width / image_width, height / image_height]
+        boxes = torch.as_tensor(relative_box, dtype=torch.float32)
 
         if self.transforms is not None:
             cropped_image, boxes = self.transforms(cropped_image, boxes)
@@ -130,17 +135,17 @@ class DetectionRefinementModel(Module):
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     model.train()
-    criterion = L1Loss()
+    criterion = MSELoss()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
 
     lr_scheduler = None
-    # if epoch == 0:
-    #     warmup_factor = 1. / 1000
-    #     warmup_iters = min(1000, len(data_loader) - 1)
-    #
-    #     lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
+    if epoch == 0:
+        warmup_factor = 1. / 1000
+        warmup_iters = min(1000, len(data_loader) - 1)
+
+        lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
 
     for images, targets in metric_logger.log_every(data_loader, print_freq, header):
         images = images.to(device)
@@ -165,16 +170,16 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
 
 
 if __name__ == '__main__':
-    device = "cpu"  # torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = DetectionRefinementModel()
     print(model)
     # If you get an error, go to torchsummary.py and fix line 100 into
     # total_input_size = abs(np.prod(sum(input_size,())) * batch_size * 4. / (1024 ** 2.))
     # see https://github.com/sksq96/pytorch-summary/issues/90
-    summary(model, [(3, 128, 256), (4,)], device=device)
+    summary(model, [(3, 128, 256), (4,)], device="cpu")
     model.to(device)
 
-    dataset = BoundingBoxRefinementDataset("D:\Dropbox\Stave Detection\CVCMUSCIMA_2000")
+    dataset = BoundingBoxRefinementDataset("E:\Dropbox\Stave Detection\CVCMUSCIMA_2000")
     first_image, bounding_box = dataset[0]
     # first_image.show()
     training_dataset_loader = DataLoader(dataset, batch_size=1, shuffle=True)
@@ -185,11 +190,16 @@ if __name__ == '__main__':
 
     num_epochs = 10
 
-    for epoch in range(num_epochs):
-        # train for one epoch, printing every 10 iterations
-        train_one_epoch(model, optimizer, training_dataset_loader, device, epoch, print_freq=1)
-        # update the learning rate
-        lr_scheduler.step()
-        # evaluate on the test dataset
-        # evaluate(model, data_loader_test, device=device)
-        torch.save(model.state_dict(), "model-{0}.pth".format(epoch))
+    os.makedirs("checkpoints",exist_ok=True)
+    try:
+        for epoch in range(num_epochs):
+            # train for one epoch, printing every 10 iterations
+            train_one_epoch(model, optimizer, training_dataset_loader, device, epoch, print_freq=20)
+            # update the learning rate
+            lr_scheduler.step()
+            # evaluate on the test dataset
+            # evaluate(model, data_loader_test, device=device)
+            torch.save(model.state_dict(), "checkpoints/model-{0}.pth".format(epoch))
+    except KeyboardInterrupt:
+        print("Saving interrupted model")
+        torch.save(model.state_dict(), "checkpoints/model-interrupt.pth".format(epoch))
