@@ -77,8 +77,8 @@ if __name__ == "__main__":
 
     with detection_graph.as_default():
         # Uncomment the following line to restrict GPU memory
-        # gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
-        gpu_options = tf.GPUOptions()
+        gpu_options = tf.GPUOptions(per_process_gpu_memory_fraction=0.4)
+        # gpu_options = tf.GPUOptions()
         with tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)) as sess:
 
             # Get handles to input and output tensors
@@ -187,11 +187,11 @@ if __name__ == "__main__":
                             elif class_name == "stave":
                                 staves.append({'left': left, 'top': top, 'right': right, 'bottom': bottom})
 
-                    detections = pd.DataFrame(data=per_file_detections_list,
-                                              columns=["image_name", "top", "left", "bottom", "right", "class_name",
-                                                       "confidence"])
-                    output_csv_file = os.path.join(output_directory, "{0}_detection.csv".format(input_file_name))
-                    detections.to_csv(output_csv_file, index=False, float_format="%.2f")
+                    # detections = pd.DataFrame(data=per_file_detections_list,
+                    #                           columns=["image_name", "top", "left", "bottom", "right", "class_name",
+                    #                                    "confidence"])
+                    # output_csv_file = os.path.join(output_directory, "{0}_detection.csv".format(input_file_name))
+                    # detections.to_csv(output_csv_file, index=False, float_format="%.2f")
                     with open(json_path, 'w') as file:
                         json.dump({'width': width, 'height': height, 'system_measures': system_measures,
                                    'stave_measures': stave_measures, 'staves': staves}, file, indent=4)

@@ -42,8 +42,9 @@ if __name__ == "__main__":
     model.load_state_dict(torch.load(args.trained_model))
 
     image = Image.open(args.input_image).convert("RGB")  # type:Image.Image
-    predicted_box = run_inference_for_single_image(image, model)
-    int_box = [int(v) for v in predicted_box]
+    predicted_box_1, predicted_box_2 = run_inference_for_single_image(image, model)
     image_draw = ImageDraw(image)
-    image_draw.rectangle(int_box, outline='#008888', width=2)
+    for predicted_box in [predicted_box_1, predicted_box_2]:
+        int_box = [int(v) for v in predicted_box]
+        image_draw.rectangle(int_box, outline='#008888', width=2)
     image.show()

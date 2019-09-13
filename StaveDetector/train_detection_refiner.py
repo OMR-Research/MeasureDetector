@@ -8,7 +8,7 @@ from typing import Tuple, Dict
 
 import torch
 from PIL import Image
-from torch.nn import Module, Conv2d, MaxPool2d, Linear, AdaptiveAvgPool2d, ReLU6, MSELoss
+from torch.nn import Module, Conv2d, MaxPool2d, Linear, AdaptiveAvgPool2d, ReLU6, MSELoss, Sigmoid, L1Loss
 from torch.utils.data import Dataset
 from torch.utils.data.dataloader import DataLoader
 from torchsummary import summary
@@ -52,7 +52,7 @@ class BoundingBoxRefinementDataset(Dataset):
             for stave in annotations["staves"]:
                 self.dataset.append((image_file, stave))
 
-    def __getitem__(self, index: int) -> Tuple[Image.Image, Dict[str, float]]:
+    def __getitem__(self, index: int) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         image_path, bounding_box = self.dataset[index]
         image = self.load_image(image_path)
 
@@ -88,12 +88,22 @@ class BoundingBoxRefinementDataset(Dataset):
         center_y = top + height / 2
 
         relative_box = [center_x / image_width, center_y / image_height, width / image_width, height / image_height]
-        boxes = torch.as_tensor(relative_box, dtype=torch.float32)
+        relative_box_with_random_distortion = relative_box.copy()
+        for i in range(4):
+            random_distortion = random.randint(0, 1000) / 10000
+            random_sign = random.sample([-1, 1], 1)[0]
+            do_transform = random.sample([True, False], 1)[0]
+            if do_transform:
+                relative_box_with_random_distortion[i] = max(0, min(1, relative_box_with_random_distortion[
+                    i] + random_distortion * random_sign))
+
+        ground_truth = torch.as_tensor(relative_box, dtype=torch.float32)
+        distorted_box = torch.as_tensor(relative_box_with_random_distortion, dtype=torch.float32)
 
         if self.transforms is not None:
-            cropped_image, boxes = self.transforms(cropped_image, boxes)
+            cropped_image, distorted_box, ground_truth = self.transforms(cropped_image, distorted_box, ground_truth)
 
-        return cropped_image, boxes
+        return cropped_image, distorted_box, ground_truth
 
     def load_image(self, image_path) -> Image.Image:
         image = Image.open(image_path).convert("RGB")
@@ -120,7 +130,10 @@ class DetectionRefinementModel(Module):
         self.avg_pool = AdaptiveAvgPool2d((1, 1))
         self.linear1 = Linear(192, 64)
         self.linear2 = Linear(64, 4)
+        self.linear3 = Linear(196, 64)
+        self.linear4 = Linear(64, 4)
         self.relu = ReLU6(inplace=True)
+        self.sigmoid = Sigmoid()
 
     def forward(self, image, unrefined_bounding_box):
         x = self.pool(self.relu(self.conv1(image)))
@@ -129,17 +142,24 @@ class DetectionRefinementModel(Module):
         x = self.relu(self.conv4(x))
 
         x = self.avg_pool(x)
-        x = x.view(x.size(0), -1)
-        x = self.relu(self.linear1(x))
-        x = self.relu(self.linear2(x))
-        # x = x + unrefined_bounding_box
+        features = x.view(x.size(0), -1)
 
-        return x
+        # First regression head, directly estimate the bounding box
+        head_1 = self.relu(self.linear1(features))
+        directly_predicted_bounding_box = self.sigmoid(self.linear2(head_1))
+
+        # Second regression head, merge in the unrefined bounding box
+        head_2 = torch.cat((features, unrefined_bounding_box), dim=1)
+        head_2 = self.relu(self.linear3(head_2))
+        guided_predicted_bounding_box = self.sigmoid(self.linear4(head_2))
+
+        return directly_predicted_bounding_box, guided_predicted_bounding_box
 
 
 def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
     model.train()
-    criterion = MSELoss()
+    mse_loss = MSELoss()
+    l1_loss = L1Loss()
     metric_logger = utils.MetricLogger(delimiter="  ")
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     header = 'Epoch: [{}]'.format(epoch)
@@ -151,12 +171,20 @@ def train_one_epoch(model, optimizer, data_loader, device, epoch, print_freq):
 
         lr_scheduler = utils.warmup_lr_scheduler(optimizer, warmup_iters, warmup_factor)
 
-    for images, targets in metric_logger.log_every(data_loader, print_freq, header):
+    for images, distorted_bounding_box, ground_truth_box in metric_logger.log_every(data_loader, print_freq, header):
         images = images.to(device)
-        targets = targets.to(device)
+        distorted_bounding_box = distorted_bounding_box.to(device)
+        ground_truth_box = ground_truth_box.to(device)
 
-        prediction = model(images, None)
-        loss = criterion(prediction, targets)
+        prediction = model(images, distorted_bounding_box)
+        directly_predicted_box, guided_predicted_box = prediction
+        # We want that both outputs produce the same result, the right bounding box
+        difference = l1_loss(directly_predicted_box, guided_predicted_box)
+        # We want that the first and second head both produce accurate results wrt. the ground truth
+        loss_1 = mse_loss(directly_predicted_box, ground_truth_box)
+        loss_2 = mse_loss(guided_predicted_box, ground_truth_box)
+        # We optimize for all these criteria
+        loss = loss_1 + loss_2 + difference
 
         if not math.isfinite(loss):
             print("Loss is {}, stopping training".format(loss))
@@ -184,7 +212,7 @@ if __name__ == '__main__':
     model.to(device)
 
     dataset = BoundingBoxRefinementDataset("E:\Dropbox\Stave Detection\CVCMUSCIMA_2000")
-    first_image, bounding_box = dataset[0]
+    first_image, bounding_box, ground_truth_box = dataset[0]
     # first_image.show()
     training_dataset_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
