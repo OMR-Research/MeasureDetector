@@ -101,3 +101,5 @@ tutorials/embedding/questions-words.txt
 samples/outreach/blogs/segmentation_blogpost/carvana-image-masking-challenge/
 **/protos/*.py
 /output_inference_*/
+/StaveDetector/data/
+*.zip

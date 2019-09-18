@@ -18,7 +18,8 @@ numpy >= 1.16.2
 lxml
 pydot
 tqdm
-omrdatasettools >= 0.15
+omrdatasettools >= 0.19
+mung
 contextlib2
 
 # For the inference server
