@@ -26,14 +26,14 @@ import json
 import os
 
 # pylint: disable=g-bad-import-order
-from absl import app as absl_app
+from absl import app
 from absl import flags
 from absl import logging
 import tensorflow as tf
 # pylint: enable=g-bad-import-order
 
-from official.datasets import movielens
 from official.recommendation import constants as rconst
+from official.recommendation import movielens
 from official.recommendation import ncf_common
 from official.recommendation import ncf_input_pipeline
 from official.recommendation import neumf_model
@@ -254,7 +254,10 @@ def run_ncf(_):
         "val_HR_METRIC", desired_value=FLAGS.hr_threshold)
     callbacks.append(early_stopping_callback)
 
-  with tf.device(tpu_lib.get_primary_cpu_task(params["use_tpu"])):
+  use_remote_tpu = params["use_tpu"] and FLAGS.tpu
+  primary_cpu_task = tpu_lib.get_primary_cpu_task(use_remote_tpu)
+
+  with tf.device(primary_cpu_task):
     (train_input_dataset, eval_input_dataset,
      num_train_steps, num_eval_steps) = \
       (ncf_input_pipeline.create_ncf_input_data(
@@ -517,4 +520,4 @@ def main(_):
 
 if __name__ == "__main__":
   ncf_common.define_ncf_flags()
-  absl_app.run(main)
+  app.run(main)

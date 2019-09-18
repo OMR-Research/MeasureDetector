@@ -30,8 +30,6 @@ from absl import flags
 from absl import logging
 import tensorflow as tf
 
-from tensorflow.python.util import object_identity
-
 # pylint: disable=g-bad-import-order
 from official.transformer import compute_bleu
 from official.transformer.utils import tokenizer
@@ -182,13 +180,13 @@ class TransformerTask(object):
       if not params["static_batch"]:
         raise ValueError("TPU requires static batch for input data.")
     else:
-      print("Running transformer with num_gpus =", num_gpus)
+      logging.info("Running transformer with num_gpus =", num_gpus)
 
     if self.distribution_strategy:
-      print("For training, using distribution strategy: ",
-            self.distribution_strategy)
+      logging.info("For training, using distribution strategy: ",
+                   self.distribution_strategy)
     else:
-      print("Not using any distribution strategy.")
+      logging.info("Not using any distribution strategy.")
 
   @property
   def use_tpu(self):
@@ -271,8 +269,7 @@ class TransformerTask(object):
           scaled_loss = loss / self.distribution_strategy.num_replicas_in_sync
 
         # De-dupes variables due to keras tracking issues.
-        tvars = list(
-            object_identity.ObjectIdentitySet(model.trainable_variables))
+        tvars = list({id(v): v for v in model.trainable_variables}.values())
         grads = tape.gradient(scaled_loss, tvars)
         opt.apply_gradients(zip(grads, tvars))
         # For reporting, the metric takes the mean of losses.
@@ -292,7 +289,8 @@ class TransformerTask(object):
           else flags_obj.steps_between_evals)
       current_iteration = current_step // flags_obj.steps_between_evals
 
-      print("Start train iteration at global step:{}".format(current_step))
+      logging.info(
+          "Start train iteration at global step:{}".format(current_step))
       history = None
       if params["use_ctl"]:
         if not self.use_tpu:
@@ -327,7 +325,7 @@ class TransformerTask(object):
         current_step += train_steps_per_eval
         logging.info("Train history: {}".format(history.history))
 
-      print("End train iteration at global step:{}".format(current_step))
+      logging.info("End train iteration at global step:{}".format(current_step))
 
       if (flags_obj.bleu_source and flags_obj.bleu_ref):
         uncased_score, cased_score = self.eval()
@@ -404,7 +402,7 @@ class TransformerTask(object):
       else:
         model.load_weights(init_weight_path)
     else:
-      print("Weights not loaded from path:{}".format(init_weight_path))
+      logging.info("Weights not loaded from path:{}".format(init_weight_path))
 
   def _create_optimizer(self):
     """Creates optimizer."""

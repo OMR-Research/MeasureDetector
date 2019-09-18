@@ -88,7 +88,11 @@ def create_model(data_format):
 
 
 def define_mnist_flags():
-  flags_core.define_base()
+  """Defines flags for mnist."""
+  flags_core.define_base(clean=True, train_epochs=True,
+                         epochs_between_evals=True, stop_threshold=True,
+                         num_gpu=True, hooks=True, export_dir=True,
+                         distribution_strategy=True)
   flags_core.define_performance(inter_op=True, intra_op=True,
                                 num_parallel_calls=False,
                                 all_reduce_alg=True)
