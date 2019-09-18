@@ -15,6 +15,7 @@ from torchsummary import summary
 from torchvision.transforms import ToTensor
 import utils
 
+from MobileNetV2 import MobileNetV2
 
 class BoundingBoxRefinementDataset(Dataset):
     """ A dataset, dedicated to bounding box refinement
@@ -217,7 +218,7 @@ if __name__ == '__main__':
     training_dataset_loader = DataLoader(dataset, batch_size=1, shuffle=True)
 
     params = [p for p in model.parameters() if p.requires_grad]
-    optimizer = torch.optim.Adam(params, lr=0.001, weight_decay=0.0005)
+    optimizer = torch.optim.Adam(params, lr=0.0001, weight_decay=0.0005)
     lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=10000, gamma=0.5)
 
     num_epochs = 10
