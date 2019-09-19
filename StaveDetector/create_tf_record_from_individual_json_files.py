@@ -18,22 +18,21 @@ from tqdm import tqdm
 
 
 def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, mask_paths: List[str],
-                                         label_map_dict: Dict[str, int]):
-    with tf.gfile.GFile(path_to_image, 'rb') as fid:
-        encoded_image = fid.read()
-    encoded_image_io = io.BytesIO(encoded_image)
-    image = PIL.Image.open(encoded_image_io)  # type: Image
+                                         label_map_dict: Dict[str, int], scale_factor: float):
+    image = PIL.Image.open(path_to_image)  # type: Image
+    image_format = image.format
 
-    # Force loading of the image to test if it is a valid image
-    try:
-        image.load()
-    except Exception as ex:
-        raise InvalidImageError("Could not load image.", ex)
-    if image.format != 'JPEG' and image.format != 'PNG':
+    if image_format != 'JPEG' and image_format != 'PNG':
         raise InvalidImageFormatError(
             f"Skipped image {path_to_image} that is neither jpeg nor png and probably does not belong to the project.")
     if image.width < 600 or image.height < 600:
         raise InvalidImageError(f"Skipped image {path_to_image} that is smaller than 600x600 and might cause issues.")
+
+    image = image.resize((int(image.width * scale_factor), int(image.height * scale_factor)), PIL.Image.LANCZOS)
+    encoded_image_io = io.BytesIO()
+    image.save(encoded_image_io, format='PNG')
+    encoded_image = encoded_image_io.getvalue()
+
     key = hashlib.sha256(encoded_image).hexdigest()
 
     image_width = image.width
@@ -51,13 +50,11 @@ def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, 
 
     object_classes = [("staves", "stave")]
     encoded_mask_png_list = []
-    for mask in mask_paths:
-        with tf.gfile.GFile(mask, 'rb') as fid:
-            encoded_image = fid.read()
-        encoded_image_io = io.BytesIO(encoded_image)
-        img = PIL.Image.open(encoded_image_io)  # type: Image
+    for mask_path in mask_paths:
+        mask = PIL.Image.open(mask_path)  # type: Image
+        mask = mask.resize((int(mask.width * scale_factor), int(mask.height * scale_factor)), PIL.Image.NEAREST)
         output = io.BytesIO()
-        img.save(output, format='PNG')
+        mask.save(output, format='PNG')
         encoded_mask_png_list.append(output.getvalue())
 
     for class_name, instance_name in object_classes:
@@ -76,14 +73,14 @@ def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, 
             if left < 0 or right < 0 or top < 0 or bottom < 0:
                 continue
 
-            xmin.append(float(left) / image_width)
-            ymin.append(float(top) / image_height)
-            xmax.append(float(right) / image_width)
-            ymax.append(float(bottom) / image_height)
+            xmin.append(float(left) / image_width * scale_factor)
+            ymin.append(float(top) / image_height * scale_factor)
+            xmax.append(float(right) / image_width * scale_factor)
+            ymax.append(float(bottom) / image_height * scale_factor)
             classes.append(label_map_dict[instance_name])
             classes_text.append(instance_name.encode('utf8'))
 
-    assert(len(xmin) == len(encoded_mask_png_list))
+    assert (len(xmin) == len(encoded_mask_png_list))
 
     example = tf.train.Example(features=tf.train.Features(feature={
         'image/height': dataset_util.int64_feature(image_height),
@@ -94,7 +91,7 @@ def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, 
             path_to_image.encode('utf8')),
         'image/key/sha256': dataset_util.bytes_feature(key.encode('utf8')),
         'image/encoded': dataset_util.bytes_feature(encoded_image),
-        'image/format': dataset_util.bytes_feature(image.format.lower().encode('utf8')),
+        'image/format': dataset_util.bytes_feature(image_format.lower().encode('utf8')),
         'image/object/bbox/xmin': dataset_util.float_list_feature(xmin),
         'image/object/bbox/xmax': dataset_util.float_list_feature(xmax),
         'image/object/bbox/ymin': dataset_util.float_list_feature(ymin),
@@ -112,7 +109,8 @@ def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, 
 def annotations_to_tf_example_list(all_image_paths: List[str],
                                    all_annotation_paths: List[str],
                                    all_mask_paths: List[str],
-                                   label_map_dict: Dict[str, int]) -> Generator[tf.train.Example, None, None]:
+                                   label_map_dict: Dict[str, int],
+                                   scale_factor: float) -> Generator[tf.train.Example, None, None]:
     """Convert json files and images to tf.Example proto.
 
     Notice that this function normalizes the bounding box coordinates provided
@@ -137,7 +135,8 @@ def annotations_to_tf_example_list(all_image_paths: List[str],
             with open(path_to_annotations, 'r') as gt_file:
                 annotations = json.load(gt_file)
 
-            example = encode_sample_into_tensorflow_sample(path_to_image, annotations, masks, label_map_dict)
+            example = encode_sample_into_tensorflow_sample(path_to_image, annotations, masks, label_map_dict,
+                                                           scale_factor)
             yield example
 
         except Exception as ex:
@@ -166,7 +165,8 @@ def get_training_validation_test_indices(all_image_paths):
 
 
 def main(image_directory: str, annotation_directory: str, mask_directory: str, output_path_training_split: str,
-         output_path_validation_split: str, output_path_test_split: str, label_map_path: str, number_of_shards: int):
+         output_path_validation_split: str, output_path_test_split: str, label_map_path: str, number_of_shards: int,
+         scale_factor: float):
     os.makedirs(os.path.dirname(output_path_training_split), exist_ok=True)
     label_map_dict = label_map_util.get_label_map_dict(label_map_path)
     all_jpg_image_paths = glob(f"{image_directory}/**/*.jpg", recursive=True)
@@ -205,7 +205,7 @@ def main(image_directory: str, annotation_directory: str, mask_directory: str, o
             tf_record_close_stack, output_path_test_split, number_of_shards)
         index = 0
         for tf_example in annotations_to_tf_example_list(all_image_paths, all_annotation_paths, all_mask_paths,
-                                                         label_map_dict):
+                                                         label_map_dict, scale_factor):
             shard_index = index % number_of_shards
             index += 1
 
@@ -238,6 +238,7 @@ if __name__ == '__main__':
     parser.add_argument('--label_map_path', type=str, default='mapping.txt',
                         help='Path to label map proto.txt')
     parser.add_argument('--num_shards', type=int, default=4, help='Number of TFRecord shards')
+    parser.add_argument('--scale_factor', type=float, default=1, help='Scale factor of the images and annotations')
 
     flags = parser.parse_args()
     image_directory = flags.image_directory
@@ -248,7 +249,8 @@ if __name__ == '__main__':
     output_path_test_split = flags.output_path_test_split
     label_map_path = flags.label_map_path
     number_of_shards = flags.num_shards
+    scale_factor = flags.scale_factor
 
     main(image_directory, annotations_directory, mask_directory, output_path_training_split,
          output_path_validation_split,
-         output_path_test_split, label_map_path, number_of_shards)
+         output_path_test_split, label_map_path, number_of_shards, scale_factor)
