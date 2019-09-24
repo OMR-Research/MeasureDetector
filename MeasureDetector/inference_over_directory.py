@@ -196,7 +196,7 @@ if __name__ == "__main__":
                     # Visualization of the results of a detection.
                     instance_masks = None  # type: np.ndarray
                     if outputs_dict.get('detection_masks') is not None:
-                        instance_masks = resize_predictions_detection_masks(index, outputs_dict, image_np.shape)
+                        instance_masks = resize_predictions_detection_masks(index, outputs_dict, image_np.shape, mask_threshold=0.5, verbose=0, debug=0)
 
                     vis_util.visualize_boxes_and_labels_on_image_array(
                         image_np,
