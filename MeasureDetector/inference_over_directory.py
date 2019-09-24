@@ -5,6 +5,7 @@ import pickle
 from glob import glob
 from time import time
 
+import PIL
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -27,6 +28,64 @@ def run_inference_for_image_batch(images_np, sess, tensor_dict):
     output_dicts['detection_classes'] = output_dicts['detection_classes'].astype(np.uint8)
 
     return output_dicts
+
+def resize_predictions_detection_masks(image_index, predictions={}, image_shape=('height','width','channels'), mask_threshold=0., verbose=1, debug=1):
+    #import PIL
+    detection_masks = []
+
+    for idx, detection_mask in enumerate(predictions['detection_masks'][image_index]):
+        height, width, _ = image_shape
+        # background_mask with all black=0
+        mask = np.zeros((height, width))
+
+        ## Get normalised bbox coordinates
+        ymin, xmin, ymax, xmax = predictions['detection_boxes'][image_index][idx]
+
+        ## Convert to image size fixed bbox coordinates
+        ymin, xmin, ymax, xmax = int(ymin*height), int(xmin*width), int(ymax*height), int(xmax*width)
+
+        ## Define bbox height and width
+        bbox_height, bbox_width = ymax-ymin, xmax-xmin
+
+        ## Resize 'detection_mask' to bbox size
+        bbox_mask = np.array(
+            PIL.Image.fromarray(np.uint8(np.array(detection_mask)*255), mode='L').resize(
+                size=(bbox_width, bbox_height), resample=Image.NEAREST)  # Image.NEAREST is fastest and no weird artefacts
+        )
+
+        ## Insert detection_mask into image.size np.zeros((height, width)) background_mask
+        mask[ymin:ymax, xmin:xmax] = bbox_mask
+        mask_threshold = mask_threshold
+        mask = np.where(mask>(mask_threshold*255), 1, mask)   # mask_threshold > 0.5 resulting mask seems too coarse, any value > 0 seems resulting in better masks
+        if mask_threshold > 0: mask = np.where(mask!=1, 0, mask)   # in case threshold is used to have other values (0)
+
+        if debug:
+            try:
+                assert(
+                        (np.unique(mask)==np.array([0., 1.])).all() # in case, bbox_mask has (0,1)
+                        or
+                        (np.unique(mask)==np.array([0.])).all()  # in case, bbox_mask resulted in only (0)
+                )
+            except Exception as e:
+                print(e)
+                print('Mask Index:', idx)
+                print('Mask unique values: ', np.unique(mask))
+                print('Expected unique values: ', np.array([0., 1.]))
+                break
+
+        ## Verbose first detection_mask
+        if (verbose==True or debug==True) and idx==0:
+            print('Index (Example): ', idx)
+            print('detection_mask shape():', np.array(detection_mask).shape)
+            print('detection_boxes:', predictions['detection_boxes'][idx])
+            print('detection_boxes@image.size (ymin, xmin, ymax, xmax) :', [ymin, xmin, ymax, xmax])
+            print('detection_boxes (height, width):', (bbox_height, bbox_width))
+
+
+        ## Append mask to list() 'detection_masks'
+        detection_masks.append(mask.astype(np.uint8))
+
+    return detection_masks
 
 
 if __name__ == "__main__":
@@ -135,19 +194,23 @@ if __name__ == "__main__":
                     per_file_detections_list = []
                     image_np = np.squeeze(images_for_batch[index], axis=0)
                     # Visualization of the results of a detection.
+                    instance_masks = None  # type: np.ndarray
+                    if outputs_dict.get('detection_masks') is not None:
+                        instance_masks = resize_predictions_detection_masks(index, outputs_dict, image_np.shape)
+
                     vis_util.visualize_boxes_and_labels_on_image_array(
                         image_np,
                         outputs_dict['detection_boxes'][index],
                         outputs_dict['detection_classes'][index],
                         outputs_dict['detection_scores'][index],
                         category_index,
-                        instance_masks=outputs_dict.get('detection_masks')[index] if outputs_dict.get(
-                            'detection_masks') is not None else None,
+                        instance_masks=instance_masks,
                         use_normalized_coordinates=True,
                         line_thickness=4,
                         skip_scores=not show_scores,
                         skip_labels=not show_labels,
                         min_score_thresh=score_threshold)
+
 
                     input_file_name, extension = os.path.splitext(os.path.basename(input_files_for_batch[index]))
                     output_file = os.path.join(output_directory, "{0}_detection{1}".format(input_file_name, extension))
