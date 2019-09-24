@@ -28,7 +28,6 @@ def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, 
     if image.width < 600 or image.height < 600:
         raise InvalidImageError(f"Skipped image {path_to_image} that is smaller than 600x600 and might cause issues.")
 
-    image = image.resize((int(image.width * scale_factor), int(image.height * scale_factor)), PIL.Image.LANCZOS)
     encoded_image_io = io.BytesIO()
     image.save(encoded_image_io, format='PNG')
     encoded_image = encoded_image_io.getvalue()
@@ -52,7 +51,6 @@ def encode_sample_into_tensorflow_sample(path_to_image: str, annotations: Dict, 
     encoded_mask_png_list = []
     for mask_path in mask_paths:
         mask = PIL.Image.open(mask_path)  # type: Image
-        mask = mask.resize((int(mask.width * scale_factor), int(mask.height * scale_factor)), PIL.Image.NEAREST)
         output = io.BytesIO()
         mask.save(output, format='PNG')
         encoded_mask_png_list.append(output.getvalue())
