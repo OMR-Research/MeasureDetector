@@ -10,4 +10,8 @@ python create_tf_record_from_individual_json_files.py
 python research/object_detection/legacy/train.py --pipeline_config_path="CONFIGURATION_PATH.config" --train_dir="PATH_TO_DATA"
 ```
 
-For example paths, see [TrainModel.ps1](TrainModel.ps1). 
+```bash
+python research/object_detection/model_main.py --alsologtostderr --pipeline_config_path="configurations/mask_rcnn_inception_resnet_v2_atrous_muscima-pp_staves.config" --model_dir="data/mask_rcnn_inception_resnet_v2_atrous_muscima-pp_staves"
+```
+For example paths, see [TrainModel.ps1](TrainModel.ps1).
+ 
