@@ -104,3 +104,4 @@ samples/outreach/blogs/segmentation_blogpost/carvana-image-masking-challenge/
 /StaveDetector/data/
 *.zip
 /DetectionRefiner/checkpoints/
+/StaveDetector/detection_output/
