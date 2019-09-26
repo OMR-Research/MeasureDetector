@@ -36,11 +36,10 @@ for image_to_remove in images_to_remove:
             print("removing " + file)
             os.remove(file)
 
-
-
+directory = r"D:\Dropbox\Stave Detection\MaskDetection\2.Iteration\masks_input\CVCMUSCIMA_2000"
 ## Delete json files that don't have images
-json_files = glob(r"E:\Stave Detection\deep_scores_temp\annotations\*.json")
-image_files = glob(r"E:\Stave Detection\deep_scores_temp\annotated/*.png")
+json_files = glob(os.path.join(directory, "*.json"))
+image_files = glob(os.path.join(directory, "*_annotated.png"))
 print(len(json_files))
 print(len(image_files))
 
@@ -55,13 +54,9 @@ for json_file in json_files:
 
 print(f"Deleted {i}/{len(json_files)} files")
 
-
-
-
-
 ## Delete images that don't have annotations
-json_files = glob(r"E:\Stave Detection\deep_scores_temp/*.json")
-image_files = glob(r"E:\Stave Detection\deep_scores_temp/*.png")
+json_files = glob(os.path.join(directory, "*.json"))
+image_files = glob(os.path.join(directory, "*.png"))
 print(len(json_files))
 print(len(image_files))
 
@@ -97,7 +92,6 @@ for unchecked_image in unchecked_images:
         os.remove(unchecked_image)
 
 print("Removed {0}/{1} already checked images".format(i, len(unchecked_images)))
-
 
 # Select a random sample of 2000 images from the existing dataset to not overwhelm the network
 all_images = glob(r"E:\Stave Detection\CVCMUSCIMA_MCA_Flat\*.png")
