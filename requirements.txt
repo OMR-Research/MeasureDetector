@@ -10,15 +10,15 @@ pytest
 # tensorflow-gpu == 1.13.1 # Alternatively if available to run vastly faster trainings. See https://github.com/philferriere/dlwin
 h5py
 scikit-learn
-scikit-image >= 0.14.2
-scipy >= 1.2.1
+scikit-image==0.17.2
+scipy==1.4.1
 sympy
-muscima >= 0.10.0
-numpy >= 1.16.2
+muscima==0.10.0
+numpy==1.18.4
 lxml
 pydot
 tqdm
-omrdatasettools >= 0.19
+omrdatasettools==1.2.2
 mung
 contextlib2
 

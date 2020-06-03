@@ -1,9 +1,10 @@
 import argparse
 import os
 
-from omrdatasettools.converters.ImageColorInverter import ImageColorInverter
-from omrdatasettools.converters.ImageConverter import ImageConverter
-from omrdatasettools.downloaders.MuscimaPlusPlusDatasetDownloader import MuscimaPlusPlusDatasetDownloader
+from omrdatasettools import Downloader, OmrDataset
+
+from MeasureDetector.ImageConverter import ImageConverter
+from MeasureDetector.ImageColorInverter import ImageColorInverter
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Downloads and prepares the MUSCIMA++ dataset')
@@ -13,9 +14,9 @@ if __name__ == "__main__":
     flags = parser.parse_args()
     dataset_directory = os.path.join(flags.dataset_directory, "muscima_pp")
 
-    dataset_downloader = MuscimaPlusPlusDatasetDownloader()
-    dataset_downloader.download_and_extract_dataset(dataset_directory)
-    dataset_downloader.download_and_extract_measure_annotations(dataset_directory)
+    dataset_downloader = Downloader()
+    dataset_downloader.download_and_extract_dataset(OmrDataset.MuscimaPlusPlus_V1, dataset_directory)
+    dataset_downloader.download_and_extract_dataset(OmrDataset.MuscimaPlusPlus_MeasureAnnotations, dataset_directory)
 
     image_inverter = ImageColorInverter()
     image_inverter.invert_images(dataset_directory, "*.png")
