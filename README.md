@@ -43,6 +43,7 @@ For Linux:
 ```bash
 # From MeasureDetector/
 export PYTHONPATH=$PYTHONPATH:`pwd`/MeasureDetector:`pwd`/research:`pwd`/research/slim
+
 ```
 
 For Windows (Powershell):
