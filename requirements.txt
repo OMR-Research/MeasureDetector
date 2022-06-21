@@ -14,7 +14,7 @@ scikit-image==0.17.2
 scipy==1.4.1
 sympy
 muscima==0.10.0
-numpy==1.18.4
+numpy==1.22.0
 lxml
 pydot
 tqdm
