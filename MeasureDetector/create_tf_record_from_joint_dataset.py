@@ -99,6 +99,10 @@ def main(dataset_directory: str, annotations_filename: str, output_path: str, la
                 current_engraving, number_of_staves = sampling_categories[index % len(sampling_categories)]
                 all_items_in_category = dataset[current_engraving][number_of_staves]
 
+                if not all_items_in_category:
+                    index += 1
+                    continue
+
                 encoding_succeeded = False
                 tf_example = None
                 while not encoding_succeeded:
@@ -137,7 +141,7 @@ def attempt_to_find_sample_that_is_not_yet_in_dataset(all_items_in_category, alr
 
     all_samples_already_used = len(fresh_samples) == 0
     if all_samples_already_used:
-        if allow_sample_reuse:
+        if allow_sample_reuse and all_items_in_category:
             return random.choice(all_items_in_category)
         else:
             return None
